@@ -1,0 +1,29 @@
+# Temporary & backup files
+*.log
+*.tmp
+*.bak
+*.swp
+
+# Python cache
+__pycache__/
+*.pyc
+
+# PowerShell cache/output
+*.ps1xml
+*.psm1
+*.cache
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# IDE/editor folders
+.vscode/
+.idea/
+
+# Secrets and config
+.env
+secrets.txt
+
+# Shell history
+.bash_history
