@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" width="150" alt="run.topli.ch Logo" />
+  <img src="logo.png" width="150" alt="run.topli.ch Logo" />
 </p>
 
 <h1 align="center">🛠 run.topli.ch</h1>
