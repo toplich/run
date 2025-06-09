@@ -1,0 +1,8 @@
+version: '3.8'
+
+services:
+  wg-peer:
+    build: .
+    container_name: wg-peer
+    privileged: true
+    network_mode: host
