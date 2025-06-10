@@ -2,7 +2,7 @@
 
 CONTAINER_NAME="wg-peer"
 DOCKER_BIN="/usr/local/bin/docker"
-LOGFILE="/var/log/wg-watchdog.log"
+LOGFILE="/var/log/watchdog_wg.log"
 
 HEALTH=$($DOCKER_BIN inspect --format='{{.State.Health.Status}}' "$CONTAINER_NAME" 2>/dev/null)
 
