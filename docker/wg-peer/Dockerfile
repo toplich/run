@@ -10,11 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bash && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Копіюємо файл тунелю та конфіг
 COPY wireguard-go /usr/bin/wireguard-go
 COPY wg0.conf /etc/wireguard/wg0.conf
 COPY entrypoint.sh /entrypoint.sh
-
 RUN chmod +x /usr/bin/wireguard-go /entrypoint.sh
 
-CMD ["/entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["tail", "-f", "/dev/null"]
