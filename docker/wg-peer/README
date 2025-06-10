@@ -25,7 +25,7 @@ docker-compose.yml – launch configuration
 entrypoint.sh – brings up the WireGuard tunnel
 watchdog_wg.sh – optional external monitor script
 wg0.conf – WireGuard config
-wireguard-go – user-space WireGuard binary
+wireguard-go – user-space WireGuard binary x86_64
 
 ## Compile wireguard-go
 
