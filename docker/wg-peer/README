@@ -1,13 +1,5 @@
 Wireguard peer
 
-📁 Folder Structure
-project-folder/
-├── Dockerfile
-├── entrypoint.sh
-├── wg0.conf
-├── wireguard-go
-
-
 vim /etc/crontab
 */5 * * * * /path/to/wg-monitor.sh >> /var/log/wg-monitor.log 2>&1
 
