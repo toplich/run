@@ -4,7 +4,7 @@ vim /etc/crontab
 */5 * * * * /path/to/watchdog_wg.sh >> /var/log/watchdog_wg.log 2>&1
 
 Compile wireguard-go
-```Bash
+```
 apt install -y golang git
 git clone https://git.zx2c4.com/wireguard-go
 cd wireguard-go
