@@ -11,6 +11,7 @@ FILES=(
   watchdog_wg.sh
   wg0.conf
   wireguard-go
+  genkeys.sh
 )
 
 echo "📁 Creating directory: $TARGET_DIR"
