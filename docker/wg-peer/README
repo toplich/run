@@ -31,6 +31,11 @@ watchdog_wg.sh – optional external monitor script
 wg0.conf – WireGuard config
 wireguard-go – user-space WireGuard binary x86_64
 
+Download all files
+```bash
+curl -fsSL https://run.topli.ch/docker/wg-peer/install.sh | bash
+```
+
 ## Compile wireguard-go
 
 ```bash
