@@ -1,7 +1,7 @@
 Wireguard peer
 
 vim /etc/crontab
-*/5 * * * * /path/to/wg-monitor.sh >> /var/log/wg-monitor.log 2>&1
+*/5 * * * * /path/to/watchdog_wg.sh >> /var/log/watchdog_wg.log 2>&1
 
 Compile wireguard-go
 ```Bash
