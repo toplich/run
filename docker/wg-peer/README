@@ -14,10 +14,14 @@ Designed for use on systems like Synology NAS where kernel module support is lim
 ```bash
 cd docker/wg-peer
 docker-compose up -d --build
-vim /etc/crontab
+```
+
+To monitor and auto-restart on failure, use watchdog_wg.sh via cron.
+vim /etc/crontab or crontab -e
+
+```bash
 */5 * * * * /path/to/watchdog_wg.sh >> /var/log/watchdog_wg.log 2>&1
 ```
-To monitor and auto-restart on failure, use watchdog_wg.sh via cron.
 
 Files
 Dockerfile – container definition
