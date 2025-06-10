@@ -1,0 +1,22 @@
+Wireguard peer
+
+📁 Folder Structure
+project-folder/
+├── Dockerfile
+├── entrypoint.sh
+├── wg0.conf
+├── wireguard-go
+
+
+vim /etc/crontab
+*/5 * * * * /path/to/wg-monitor.sh >> /var/log/wg-monitor.log 2>&1
+
+Compile wireguard-go
+```Bash
+apt install -y golang git
+git clone https://git.zx2c4.com/wireguard-go
+cd wireguard-go
+go build
+cp wireguard /usr/bin/wireguard-go
+chmod +x /usr/bin/wireguard-go
+```
