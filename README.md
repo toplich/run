@@ -20,6 +20,7 @@
 sh/       → Bash scripts (.sh)
 ps/       → PowerShell scripts (.ps1)
 py/       → Python scripts (.py)
+docker/   → Docker containers
 .gitignore
 README.md
 ```
