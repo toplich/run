@@ -25,7 +25,7 @@ for file in "${FILES[@]}"; do
 done
 
 echo "🔐 Setting execute permissions..."
-chmod +x entrypoint.sh watchdog_wg.sh wireguard-go
+chmod +x entrypoint.sh watchdog_wg.sh genkeys.sh wireguard-go
 
 echo ""
 echo "✅ Done!"
