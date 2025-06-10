@@ -1,10 +1,35 @@
-Wireguard peer
+# WireGuard Peer Container
 
+Minimal Docker-based WireGuard peer, built with `wireguard-go` for user-space tunneling.  
+Designed for use on systems like Synology NAS where kernel module support is limited.
+
+## Features
+- Runs WireGuard in user-space using `wireguard-go`
+- Healthcheck and watchdog script for automatic tunnel recovery
+- Host networking mode for full IP stack access
+- Configuration stored in bind-mounted `wg0.conf`
+
+## Usage
+
+```bash
+cd docker/wg-peer
+docker-compose up -d --build
 vim /etc/crontab
 */5 * * * * /path/to/watchdog_wg.sh >> /var/log/watchdog_wg.log 2>&1
-
-Compile wireguard-go
 ```
+To monitor and auto-restart on failure, use watchdog_wg.sh via cron.
+
+Files
+Dockerfile – container definition
+docker-compose.yml – launch configuration
+entrypoint.sh – brings up the WireGuard tunnel
+watchdog_wg.sh – optional external monitor script
+wg0.conf – WireGuard config
+wireguard-go – user-space WireGuard binary
+
+## Compile wireguard-go
+
+```bash
 apt install -y golang git
 git clone https://git.zx2c4.com/wireguard-go
 cd wireguard-go
