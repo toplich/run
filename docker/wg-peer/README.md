@@ -59,16 +59,8 @@ Add:
 Designed for environments like Synology NAS, VPS, or LXC where kernel module access is restricted
 Compatible with x86_64 architecture
 No keys or configuration are stored inside the image
-🔗 Resources
-
-- [Project Page](https://run.topli.ch/docker/wg-peer/README.md)
-- [WireGuard Documentation](https://www.wireguard.com/)
-- [Official GitHub Repo](https://github.com/WireGuard)
-
-© 2025 run.topli.ch — Lightweight Zero-Kernel VPN with Docker
 
 ## Compile wireguard-go
-
 ```bash
 apt install -y golang git
 git clone https://git.zx2c4.com/wireguard-go
@@ -77,3 +69,11 @@ go build
 cp wireguard /usr/bin/wireguard-go
 chmod +x /usr/bin/wireguard-go
 ```
+
+🔗 Resources
+
+- [Project Page](https://run.topli.ch/docker/wg-peer/README.md)
+- [WireGuard Documentation](https://www.wireguard.com/)
+- [Official GitHub Repo](https://github.com/WireGuard)
+
+© 2025 run.topli.ch
