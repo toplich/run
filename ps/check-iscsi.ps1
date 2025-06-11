@@ -1,43 +1,57 @@
-# iSCSI Monitor and Reconnect Script with CHAP
-$target = "iqn.2000-01.com.synology:storage.target01"
-$mountPath = "R:\"
-$logPath = "C:\Logs\iscsi-monitor.log"
+# === iSCSI Monitor Script ===
 
-# CHAP credentials
-$username = "chapuser"
-$password = ConvertTo-SecureString "chapsecret" -AsPlainText -Force
-$cred = New-Object System.Management.Automation.PSCredential($username, $password)
+# Налаштування параметрів
+$TargetIP     = "192.168.1.2"
+$TargetIQN    = "iqn.2000-01.com.synology:Target-veeam.KH86vrsf"
+$ChapUser     = "veeam"
+$ChapPassword = "StrongPass123"
+$LogFile      = "C:\Scripts\iscsi-monitor.log"
 
-function Log {
-    param ($msg)
-    Add-Content -Path $logPath -Value "$(Get-Date -Format u) - $msg"
+function Write-Log {
+    param ([string]$message)
+    $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    "$timestamp`t$message" | Tee-Object -FilePath $LogFile -Append
 }
 
-$sessions = Get-IscsiSession
-$active = $sessions | Where-Object { $_.TargetNodeAddress -eq $target }
+Write-Log "=== Запуск моніторингу iSCSI ==="
 
-$fsAccessible = $false
-try {
-    $tmp = Join-Path $mountPath "test-iscsi.txt"
-    New-Item -Path $tmp -ItemType File -Force | Out-Null
-    Remove-Item -Path $tmp -Force
-    $fsAccessible = $true
-} catch {
-    $fsAccessible = $false
-}
+# Перевірка активної сесії
+$session = iscsicli SessionList | Select-String -Context 0,10 $TargetIQN
 
-if (-not $active -or -not $fsAccessible) {
-    Log "iSCSI inactive or filesystem inaccessible. Reconnecting..."
-    try {
-        if ($active) {
-            Disconnect-IscsiTarget -NodeAddress $target -Confirm:$false
-            Start-Sleep -Seconds 3
-        }
-        Connect-IscsiTarget -NodeAddress $target -IsPersistent $true -AuthenticationType OneWayCHAP -Credential $cred | Out-Null
-        Log "Reconnection successful."
-    } catch {
-        Log "Reconnection failed: $_"
-    }
+if ($session) {
+    Write-Log "✅ Сесія з $TargetIQN активна."
+    exit 0
 } else {
-    Log "iSCSI session and filesystem are healthy."
+    Write-Log "⚠️  Сесія з $TargetIQN відсутня. Спроба підключення..."
+}
+
+# Додаємо портал (може бути зайвим, якщо вже додано)
+Write-Log "🌐 Додаємо Target Portal $TargetIP"
+iscsicli QAddTargetPortal $TargetIP | Out-Null
+
+# Отримуємо список таргетів
+$targets = iscsicli ListTargets | Select-String $TargetIQN
+
+if (!$targets) {
+    Write-Log "❌ Таргет $TargetIQN не знайдено на порталі $TargetIP"
+    exit 1
+}
+
+# Спроба підключення з CHAP
+Write-Log "🔐 Спроба логіну до таргету через CHAP"
+Start-Process -NoNewWindow -Wait -FilePath "iscsicli.exe" -ArgumentList @(
+  "QLoginTarget", $TargetIQN, $ChapUser, $ChapPassword
+)
+
+Start-Sleep -Seconds 2
+
+# Повторна перевірка сесії
+$sessionNew = iscsicli SessionList | Select-String -Context 0,10 $TargetIQN
+
+if ($sessionNew) {
+    Write-Log "✅ Успішне підключення до $TargetIQN"
+    exit 0
+} else {
+    Write-Log "❌ Не вдалося підключитися до $TargetIQN"
+    exit 1
 }
