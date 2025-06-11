@@ -1,3 +1,4 @@
+# Task Scheduler Library taskschd.msc
 $TaskName = "iSCSI Monitor"
 $ScriptPath = "C:\Scripts\check-iscsi.ps1"
 
