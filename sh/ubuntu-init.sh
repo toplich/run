@@ -80,7 +80,7 @@ enable_time_sync() {
 }
 
 set_hostname() {
-    local new_hostname="teleport"
+    local new_hostname="veeam-repo"
     echo "🏷️ Setting hostname: $new_hostname"
     sudo hostnamectl set-hostname "$new_hostname"
     echo "127.0.1.1   $new_hostname" | sudo tee -a /etc/hosts
