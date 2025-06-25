@@ -21,5 +21,4 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    entrypoint: ["/bin/sh", "-c", "/entrypoint.sh"]
     restart: unless-stopped
