@@ -17,7 +17,7 @@ services:
       MINIO_BROWSER_REDIRECT_URL: ${GUI}
     command: server /data --console-address ":9001"
     healthcheck:
-      test: ["CMD", "curl", "-k", "${ENDPOINT}/minio/health/ready"]
+      test: ["CMD", "mc", "ready", "--insecure", "${ALIAS}"]
       interval: 10s
       timeout: 5s
       retries: 5
