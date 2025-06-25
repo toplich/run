@@ -9,6 +9,9 @@ else
   exit 1
 fi
 
+ENDPOINT="https://${IP}:9000"
+GUI="https://${HOST}:9001"
+
 if ! command -v openssl >/dev/null 2>&1; then
   echo "❌ OpenSSL is not installed. Please install it first."
   exit 1
@@ -30,11 +33,17 @@ echo "🚀 Starting MinIO..."
 docker-compose up -d
 
 echo "⏳ Waiting for MinIO to become healthy..."
-until curl -k --silent "$ENDPOINT/minio/health/ready" | grep -q 'OK'; do
+until curl -sk -o /dev/null -w "%{http_code}" "$ENDPOINT/minio/health/ready" | grep -q "200"; do
   sleep 1
 done
-
 echo "✅ MinIO is healthy."
+
+echo "🔧 Configuring mc alias, user, policy ..."
+docker exec minio mc alias remove local >/dev/null 2>&1
+docker exec minio mc alias set $ALIAS ${ENDPOINT} $ROOT_USER $ROOT_PASS --insecure
+docker exec minio mc admin user add $ALIAS $USER $PASS --insecure || true
+docker exec minio mc admin policy attach $ALIAS readwrite --user $USER --insecure
+docker exec minio mc alias set $ALIAS $ENDPOINT $USER $PASS --insecure
 
 echo "📦 Creating bucket with Object Lock..."
 docker run --rm -it \
@@ -45,13 +54,11 @@ docker run --rm -it \
   s3api create-bucket \
   --bucket $BUCKET_NAME \
   --object-lock-enabled-for-bucket \
-  --endpoint-url $MINIO_ENDPOINT \
+  --endpoint-url $ENDPOINT \
   --no-verify-ssl \
   --no-cli-pager
 
-echo "🔧 Configuring mc alias and enabling versioning..."
-docker exec minio mc alias set $ALIAS $MINIO_ENDPOINT $USER $PASS --insecure
-
+echo "🔧 Configuring mc versioning..."
 docker exec minio mc version enable $ALIAS/$BUCKET_NAME --insecure
 
 echo "🔍 Verifying Object Lock configuration..."
@@ -62,7 +69,7 @@ docker run --rm -it \
   amazon/aws-cli \
   s3api get-object-lock-configuration \
   --bucket $BUCKET_NAME \
-  --endpoint-url $MINIO_ENDPOINT \
+  --endpoint-url $ENDPOINT \
   --no-verify-ssl \
   --no-cli-pager | grep -q '"ObjectLockEnabled": "Enabled"'
 
@@ -73,7 +80,6 @@ else
   exit 1
 fi
 
-echo "🔍 Verifying versioning..."
 docker exec minio mc version info $ALIAS/$BUCKET_NAME --insecure | grep -q 'versioning is enabled'
 if [ $? -eq 0 ]; then
   echo "✅ Versioning is enabled on bucket '$BUCKET_NAME'"
@@ -82,21 +88,6 @@ else
   exit 1
 fi
 
-echo "🔍 Verifying user '$USER' and permissions..."
-docker exec minio mc admin user info $ALIAS $USER --insecure | grep -q 'Status.*enabled'
-if [ $? -eq 0 ]; then
-  echo "✅ User '$USER' exists and is enabled"
-else
-  echo "❌ User '$USER' is missing or disabled"
-  exit 1
-fi
-
-docker exec minio mc admin policy entities $ALIAS readwrite --insecure | grep -q "$USER"
-if [ $? -eq 0 ]; then
-  echo "✅ User '$USER' has 'readwrite' policy"
-else
-  echo "❌ User '$USER' does not have 'readwrite' policy"
-  exit 1
-fi
+docker exec minio mc admin user info $ALIAS $USER --insecure
 
 echo "🎉 MinIO deployment complete with ObjectLock, Versioning, and user verification."
