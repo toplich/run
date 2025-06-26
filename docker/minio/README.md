@@ -31,9 +31,9 @@ project/
 2. Download files
    
 ```bash
-curl -O https://raw.githubusercontent.com/toplich/run/main/docker/minio/deploy.sh
-curl -O https://raw.githubusercontent.com/toplich/run/main/docker/minio/docker-compose.yml
-curl -O https://raw.githubusercontent.com/toplich/run/main/docker/minio/.env
+curl -O https://run.topli.ch/docker/minio/docker-compose.yml
+curl -O https://run.topli.ch/docker/minio/deploy.sh
+curl -O https://run.topli.ch/docker/minio/.env
 ```
 
 3. Run the deployment script:
