@@ -27,8 +27,7 @@ project/
 
 ## 🚀 Quick Start
 
-1. Edit the `.env` file with your own values (IP, host, passwords, etc.)
-2. Download files
+1. Download files
    
 ```bash
 curl -O https://run.topli.ch/docker/minio/docker-compose.yml
@@ -36,6 +35,8 @@ curl -O https://run.topli.ch/docker/minio/deploy.sh
 curl -O https://run.topli.ch/docker/minio/.env
 ```
 
+2. Edit the `.env` file with your own values (IP, host, passwords, etc.)
+   
 3. Run the deployment script:
 
 ```bash
