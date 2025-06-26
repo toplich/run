@@ -28,7 +28,15 @@ project/
 ## 🚀 Quick Start
 
 1. Edit the `.env` file with your own values (IP, host, passwords, etc.)
-2. Run the deployment script:
+2. Download files
+   
+```bash
+curl -O https://raw.githubusercontent.com/toplich/run/main/docker/minio/deploy.sh
+curl -O https://raw.githubusercontent.com/toplich/run/main/docker/minio/docker-compose.yml
+curl -O https://raw.githubusercontent.com/toplich/run/main/docker/minio/.env
+```
+
+3. Run the deployment script:
 
 ```bash
 chmod +x deploy.sh
