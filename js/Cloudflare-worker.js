@@ -21,9 +21,9 @@ export default {
       const { formType, ...fields } = data;
 
       // Subject je nach Formular
-      let subject = "Neue Nachricht von Allegra";
-      if (formType === "anmeldung") subject = "Neue Anmeldung von Allegra";
-      if (formType === "gruppe") subject = "Neue Gruppen-Registrierung von Allegra";
+      let subject = "Neue Nachricht";
+      if (formType === "anmeldung") subject = "Neue Anmeldung";
+      if (formType === "gruppe") subject = "Neue Gruppen-Registrierung";
 
       // Body bauen
       let body = `Formular: ${formType}\n\n`;
