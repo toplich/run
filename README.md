@@ -2,8 +2,6 @@
   <img src="logo.png" width="150" alt="run.topli.ch Logo" />
 </p>
 
-<h1 align="center">⚙️ run.topli.ch</h1>
-
 <p align="center">
   <strong>A curated collection of automation and admin scripts</strong><br>
   written in <code>Bash</code>, <code>PowerShell</code>, <code>Python</code>, <code>JavaScript</code> and <code>Docker</code>.
