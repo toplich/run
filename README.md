@@ -30,8 +30,8 @@
 
 You can run or download scripts directly using a simple command:
 
-### 🐧 Linux / macOS (Bash)
-▶️ Run a script directly
+### 🐧 **Linux / macOS (Bash)**
+▶️ **Run a script directly**
 ```bash
 curl -s https://run.topli.ch/sh/hello.sh | bash
 ```
@@ -39,8 +39,7 @@ or
 ```bash
 curl -s https://raw.githubusercontent.com/toplich/run.topli.ch/main/sh/hello.sh | bash
 ```
----
-💾 Download a single script
+💾 **Download a single script**
 ```bash
 curl -O https://run.topli.ch/sh/hello.sh
 ```
@@ -48,22 +47,30 @@ or
 ```bash
 wget https://run.topli.ch/py/hello.py
 ```
----
-Review a script before executing:
+🔍 **Review a script before executing**
 ```bash
 curl -s https://run.topli.ch/sh/hello.sh | less
 ```
----
+📁 **Download a folder with scripts (via CLI)**
+```bash
+git clone --depth 1 --filter=blob:none --sparse git@github.com:toplich/run.git
+cd run
+git sparse-checkout set docker/minio
+```
+
 ### 🪟 Windows (PowerShell)
-▶️ Run a script directly
+▶️ **Run a script directly**
 ```powershell
 irm https://run.topli.ch/ps/hello.ps1 | iex
 ```
-💾 Download a single script
+💾 **Download a single script**
 ```powershell
 iwr https://run.topli.ch/ps/hello.ps1 -OutFile .\hello.ps1
 ```
-
+🌐 **Download a folder with scripts (via browser)**
+```powershell
+[iwr https://run.topli.ch/ps/hello.ps1 -OutFile .\hello.ps1](https://download-directory.github.io/?url=https://github.com/toplich/run/tree/main/docker/minio)
+```
 ---
 
 ## 📄 Notes
