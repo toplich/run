@@ -68,8 +68,8 @@ irm https://run.topli.ch/ps/hello.ps1 | iex
 iwr https://run.topli.ch/ps/hello.ps1 -OutFile .\hello.ps1
 ```
 🌐 **Download a folder with scripts (via browser)**
-```powershell
-[iwr https://run.topli.ch/ps/hello.ps1 -OutFile .\hello.ps1](https://download-directory.github.io/?url=https://github.com/toplich/run/tree/main/docker/minio)
+```
+https://download-directory.github.io/?url=https://github.com/toplich/run/tree/main/docker/minio
 ```
 ---
 
