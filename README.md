@@ -35,6 +35,11 @@ You can run or download scripts directly using a simple command:
 ```bash
 curl -s https://run.topli.ch/sh/hello.sh | bash
 ```
+or
+```bash
+curl -s https://raw.githubusercontent.com/toplich/run.topli.ch/main/sh/hello.sh | bash
+```
+---
 💾 Download a single script
 ```bash
 curl -O https://run.topli.ch/sh/hello.sh
@@ -43,11 +48,12 @@ or
 ```bash
 wget https://run.topli.ch/py/hello.py
 ```
+---
 Review a script before executing:
 ```bash
 curl -s https://run.topli.ch/sh/hello.sh | less
 ```
-
+---
 ### 🪟 Windows (PowerShell)
 ▶️ Run a script directly
 ```powershell
