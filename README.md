@@ -71,14 +71,6 @@ iwr https://run.topli.ch/ps/hello.ps1 -OutFile .\hello.ps1
 ```
 https://download-directory.github.io/?url=https://github.com/toplich/run/tree/main/docker/minio
 ```
----
-
-## 📄 Notes
-
-- All scripts are lightweight, portable, and easy to use
-- Hosted via [GitHub Pages](https://pages.github.com)
-- Custom domain: [run.topli.ch](https://run.topli.ch)
-- Maintained by [Vitalii Stepchuk](https://blog.topli.ch)
 
 ---
 
