@@ -31,24 +31,35 @@
 You can run or download scripts directly using a simple command:
 
 ### 🔧 Bash
-
+Run
 ```bash
 curl -s https://run.topli.ch/sh/hello.sh | bash
 ```
+Download
+```bash
+curl -O https://run.topli.ch/sh/hello.sh
+```
 
 ### ⚙️ PowerShell
-
+Run
 ```powershell
 irm https://run.topli.ch/ps/hello.ps1 | iex
 ```
+Download
+```powershell
+iwr https://run.topli.ch/ps/hello.ps1 -OutFile hello.ps1
+```
 
 ### 🐍 Python (download and run)
-
+Run
 ```bash
 curl -O https://run.topli.ch/py/hello.py
 python3 hello.py
 ```
-
+Download
+```bash
+wget https://run.topli.ch/py/hello.py
+```
 ---
 
 ## 📄 Notes
