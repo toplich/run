@@ -18,14 +18,6 @@
 
 ## 📁 Directory Structure
 
-```
-docker/   → Docker containers
-js/       → JavaScript (.js)
-ps/       → PowerShell scripts (.ps1)
-py/       → Python scripts (.py)
-sh/       → Bash scripts (.sh)
-```
-
 | Folder | Language / Purpose |
 |:--------|:-------------------|
 | 🐳 `docker/` | Dockerfiles and containerized tool configurations |
