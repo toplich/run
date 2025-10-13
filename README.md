@@ -43,6 +43,10 @@ or
 ```bash
 wget https://run.topli.ch/py/hello.py
 ```
+Review a script before executing:
+```bash
+curl -s https://run.topli.ch/sh/hello.sh | less
+```
 
 ### 🪟 Windows (PowerShell)
 ▶️ Run a script directly
@@ -51,7 +55,7 @@ irm https://run.topli.ch/ps/hello.ps1 | iex
 ```
 💾 Download a single script
 ```powershell
-iwr https://run.topli.ch/ps/hello.ps1 -OutFile hello.ps1
+iwr https://run.topli.ch/ps/hello.ps1 -OutFile .\hello.ps1
 ```
 
 ---
