@@ -22,8 +22,6 @@ js/       → JavaScript (.js)
 ps/       → PowerShell scripts (.ps1)
 py/       → Python scripts (.py)
 sh/       → Bash scripts (.sh)
-
-README.md
 ```
 
 ---
