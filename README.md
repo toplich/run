@@ -17,11 +17,12 @@
 ## 📁 Directory Structure
 
 ```
-sh/       → Bash scripts (.sh)
+docker/   → Docker containers
+js/       → JavaScript (.js)
 ps/       → PowerShell scripts (.ps1)
 py/       → Python scripts (.py)
-docker/   → Docker containers
-.gitignore
+sh/       → Bash scripts (.sh)
+
 README.md
 ```
 
