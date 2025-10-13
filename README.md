@@ -5,7 +5,8 @@
 <h1 align="center">🛠 run.topli.ch</h1>
 
 <p align="center">
-  A curated collection of scripts written in <strong>Bash</strong>, <strong>PowerShell</strong>, and <strong>Python</strong> — hosted with GitHub Pages and accessible via clean URLs.
+  <strong>A curated collection of automation and admin scripts</strong><br>
+  written in <code>Bash</code>, <code>PowerShell</code>, <code>Python</code>, <code>JavaScript</code> and <code>Docker</code>.
 </p>
 
 <p align="center">
