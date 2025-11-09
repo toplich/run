@@ -1,9 +1,7 @@
 <#
 .SYNOPSIS
 Automatic NVIDIA vGPU license update via FastAPI-DLS
-– Uses standard ssh and scp
-– Stores files in /home/<user>/<hostname>/
-– Password is passed via here-string (expect)
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 #>
 
 # ========== Configuration ==========
