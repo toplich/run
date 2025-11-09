@@ -2,23 +2,56 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>File Browser - run.topli.ch</title>
+<title>run.topli.ch – File Browser</title>
 <style>
-body { font-family: sans-serif; margin: 40px; }
+body {
+  font-family: system-ui, sans-serif;
+  margin: 40px;
+  max-width: 900px;
+  margin-inline: auto;
+  line-height: 1.6;
+}
+h1, h2 { color: #0366d6; }
 a { text-decoration: none; color: #0366d6; }
 a:hover { text-decoration: underline; }
+pre, code { background: #f6f8fa; padding: 2px 4px; border-radius: 4px; }
 ul { list-style-type: none; padding-left: 20px; }
+#readme { border-bottom: 2px solid #e1e4e8; padding-bottom: 20px; margin-bottom: 30px; }
 </style>
 </head>
 <body>
-<h1>📂 Files in run.topli.ch</h1>
-<div id="file-list">Loading...</div>
+<h1>📂 run.topli.ch</h1>
+
+<div id="readme">Loading README...</div>
+<div id="file-list">Loading file list...</div>
 
 <script>
-const repoOwner = "toplich";        // заміни на свій логін
-const repoName = "run";             // заміни на свій репозиторій
-const branch = "main";              // або "master"
+// ------------------ CONFIG ------------------
+const repoOwner = "toplich";  // ← заміни на свій логін
+const repoName  = "run";      // ← заміни на свій репозиторій
+const branch    = "main";     // або "master"
 
+// ------------------ LOAD README ------------------
+async function loadReadme() {
+  const url = `https://api.github.com/repos/${repoOwner}/${repoName}/readme?ref=${branch}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    document.getElementById("readme").innerText = "❌ README not found";
+    return;
+  }
+  const data = await res.json();
+  const md = atob(data.content);
+  // Markdown → HTML через GitHub API (використовує GitHub renderer)
+  const htmlRes = await fetch("https://api.github.com/markdown", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: md, mode: "gfm", context: `${repoOwner}/${repoName}` })
+  });
+  const html = await htmlRes.text();
+  document.getElementById("readme").innerHTML = html;
+}
+
+// ------------------ LIST FILES ------------------
 async function listFiles(path = "") {
   const url = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}?ref=${branch}`;
   const res = await fetch(url);
@@ -27,6 +60,7 @@ async function listFiles(path = "") {
 
   let html = "<ul>";
   for (const item of data) {
+    if (item.name === "README.md" || item.name === "index.html") continue; // не показуємо
     if (item.type === "dir") {
       html += `<li>📁 <strong>${item.name}</strong>${await listFiles(item.path)}</li>`;
     } else {
@@ -38,6 +72,7 @@ async function listFiles(path = "") {
 }
 
 (async () => {
+  await loadReadme();
   document.getElementById("file-list").innerHTML = await listFiles();
 })();
 </script>
