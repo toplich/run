@@ -258,4 +258,5 @@ $scripts = @(
 } *&gt;&amp;1 | Out-String -Stream &gt;&gt; "C:\Windows\Setup\Scripts\FirstLogon.log";
 		</File>
 	</Extensions>
+
 </unattend>
