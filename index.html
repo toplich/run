@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <title>run.topli.ch – File Browser</title>
+
+<!-- GitHub Markdown style -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css">
+
 <style>
 body {
   font-family: system-ui, sans-serif;
@@ -21,35 +24,35 @@ ul { list-style-type: none; padding-left: 20px; }
 </style>
 </head>
 <body>
-<h1>📂 run.topli.ch</h1>
+<h1>&#128193; run.topli.ch</h1>
 
 <div id="readme" class="markdown-body">Loading README...</div>
 <div id="file-list">Loading file list...</div>
 
+<!-- Markdown parser -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
 <script>
 // ------------------ CONFIG ------------------
-const repoOwner = "toplich";  // ← заміни на свій логін
-const repoName  = "run";      // ← заміни на свій репозиторій
-const branch    = "main";     // або "master"
+const repoOwner = "toplich";
+const repoName  = "run";
+const branch    = "main";
 
 // ------------------ LOAD README ------------------
 async function loadReadme() {
-  const url = `https://api.github.com/repos/${repoOwner}/${repoName}/readme?ref=${branch}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    document.getElementById("readme").innerText = "❌ README not found";
-    return;
+  try {
+    // Отримуємо сирий README.md напряму з GitHub
+    const url = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/README.md`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("README not found");
+    const md = await res.text();
+
+    // Рендеримо Markdown у HTML локально (через Marked.js)
+    const html = marked.parse(md);
+    document.getElementById("readme").innerHTML = html;
+  } catch (e) {
+    document.getElementById("readme").innerText = "❌ Error loading README: " + e.message;
   }
-  const data = await res.json();
-  const md = atob(data.content);
-  // Markdown → HTML через GitHub API (використовує GitHub renderer)
-  const htmlRes = await fetch("https://api.github.com/markdown", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: md, mode: "gfm", context: `${repoOwner}/${repoName}` })
-  });
-  const html = await htmlRes.text();
-  document.getElementById("readme").innerHTML = html;
 }
 
 // ------------------ LIST FILES ------------------
@@ -61,17 +64,18 @@ async function listFiles(path = "") {
 
   let html = "<ul>";
   for (const item of data) {
-    if (item.name === "README.md" || item.name === "index.html") continue; // не показуємо
+    if (item.name === "README.md" || item.name === "index.html") continue;
     if (item.type === "dir") {
-      html += `<li>📁 <strong>${item.name}</strong>${await listFiles(item.path)}</li>`;
+      html += `<li>&#128193; <strong>${item.name}</strong>${await listFiles(item.path)}</li>`; // 📁
     } else {
-      html += `<li>📄 <a href="${item.download_url}" target="_blank">${item.path}</a></li>`;
+      html += `<li>&#128196; <a href="${item.download_url}" target="_blank">${item.path}</a></li>`; // 📄
     }
   }
   html += "</ul>";
   return html;
 }
 
+// ------------------ MAIN ------------------
 (async () => {
   await loadReadme();
   document.getElementById("file-list").innerHTML = await listFiles();
