@@ -18,11 +18,11 @@
 
 | Folder | Language / Purpose |
 |:--------|:-------------------|
-| 🐳 `docker/` | Dockerfiles and containerized tool configurations |
-| ⚙️ `js/` | Node.js / JavaScript helpers for automation and network tasks |
-| 💻 `ps/` | PowerShell scripts for Windows Server, AD, and backup management |
-| 🐍 `py/` | Python utilities for APIs, data parsing, and system reporting |
-| 🐚 `sh/` | Bash scripts for Linux automation, monitoring, backups |
+| &#128051; `docker/` | Dockerfiles and containerized tool configurations |
+| &#9881;&#65039; `js/` | Node.js / JavaScript helpers for automation and network tasks |
+| &#128187; `ps/` | PowerShell scripts for Windows Server, AD, and backup management |
+| &#128013; `py/` | Python utilities for APIs, data parsing, and system reporting |
+| &#128026; `sh/` | Bash scripts for Linux automation, monitoring, backups |
 
 ---
 
