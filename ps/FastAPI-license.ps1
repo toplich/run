@@ -131,19 +131,18 @@ if ($dllPath) {
 Start-Service NVDisplay.ContainerLocalSystem
 
 # ----------------------- 9 Getting Client Token -----------------------
-Write-Host "`n Get Client Token from FastAPI-DLS..." -ForegroundColor Cyan
+Write-Host "Get Client Token from FastAPI-DLS..." -ForegroundColor Cyan
 curl.exe --insecure -L -X GET "https://$LinuxHost/-/client-token" -o $TokenPath
 Write-Host " Token saved in: $TokenPath"
 
 # ----------------------- 10 Restart Nvidia -----------------------
-Write-Host "`n restart NVIDIA..." -ForegroundColor Cyan
+Write-Host "restart NVIDIA..." -ForegroundColor Cyan
 Restart-Service NVDisplay.ContainerLocalSystem
 
 # ----------------------- Check License -----------------------
-Write-Host "`n Check License NVIDIA..." -ForegroundColor Yellow
+Write-Host " Check License NVIDIA..." -ForegroundColor Yellow
 sleep 60
 & nvidia-smi -q | Select-String "License"
 
 # ----------------------- Completion -----------------------
 Write-Host "`n Operation completed successfully!" -ForegroundColor Green
-Write-Host "Patch saved in: $LocalOutPath"
