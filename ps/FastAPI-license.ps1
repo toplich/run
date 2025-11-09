@@ -9,7 +9,6 @@ Automatic NVIDIA vGPU license update via FastAPI-DLS
 # ========== Configuration ==========
 $LinuxHost = "192.168.11.23"
 $LinuxUser = "administrator"
-$LinuxPass = "88.Sieb-25!!AHDLS"
 $HomeDIR = "/home/$LinuxUser"
 $Patcher = "$HomeDIR/gridd-unlock-patcher"
 $RootCA = "$HomeDIR/rootCA.pem"
@@ -28,54 +27,68 @@ $replacementDll = "$HOME\Desktop\nvxdapix.dll"
 $logFile = "$HOME\dll_replacement_log.txt"
 # ===================================
 
-Write-Host "`n💻 Windows host: $HostName" -ForegroundColor Cyan
-Write-Host "📡 FastAPI-DLS server: $LinuxHost" -ForegroundColor Cyan
-Write-Host "📁 Remote directory: $RemoteHostDir`n" -ForegroundColor Cyan
+Write-Host "`n Windows host: $HostName" -ForegroundColor Cyan
+Write-Host " FastAPI-DLS server: $LinuxHost" -ForegroundColor Cyan
+Write-Host " Remote directory: $RemoteHostDir`n" -ForegroundColor Cyan
 
-# ----------------------- 1️⃣ Check Linux server availability -----------------------
-Write-Host "🔍 Checking Linux server availability..." -ForegroundColor Cyan
+# ----------------------- 1 Check Linux server availability -----------------------
+Write-Host " Checking Linux server availability..." -ForegroundColor Cyan
 if (-not (Test-Connection -ComputerName $LinuxHost -Count 1 -Quiet)) {
-    Write-Host "❌ Server $LinuxHost is unreachable." -ForegroundColor Red
+    Write-Host " Server $LinuxHost is unreachable." -ForegroundColor Red
     exit
 }
 
-# ----------------------- 2️⃣ Search for $dllName -----------------------
-Write-Host "`n🔍 Searching for $dllName in DriverStore..." -ForegroundColor Cyan
+# ----------------------- 2 Search for $dllName -----------------------
+Write-Host "`n Searching for $dllName in DriverStore..." -ForegroundColor Cyan
 $dll = Get-ChildItem -Path $searchRoot -Recurse -Filter $dllName -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $dll) {
-    Write-Host "❌ $dllName not found." -ForegroundColor Red
+    Write-Host " $dllName not found." -ForegroundColor Red
     exit
 }
-Write-Host "✅ Found: $($dll.FullName)"
+Write-Host "Found: $($dll.FullName)"
 
-# ----------------------- 3️⃣ Create directory -----------------------
-Write-Host "`n📂 Creating directory $RemoteHostDir..." -ForegroundColor Cyan
-ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no $LinuxUser@$LinuxHost "bash -c 'mkdir -p $RemoteHostDir && chmod 700 $RemoteHostDir'"
+# ----------------------- 3 Create directory -----------------------
+Write-Host "Creating directory $RemoteHostDir" -ForegroundColor Cyan
+$cmd = "mkdir -p '$RemoteHostDir'"
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${LinuxUser}@${LinuxHost} "bash -c '$cmd'"
 
-# ----------------------- 4️⃣ Check Root-CA -----------------------
-Write-Host "`n🔑 Checking for Root-CA..." -ForegroundColor Cyan
-$exists = ssh $LinuxUser@$LinuxHost "if [ -f $RootCA ]; then echo 1; else echo 0; fi"
-if ($exists.Trim() -eq "1") {
-    Write-Host "✅ Root-CA already exists"
-} else {
-    Write-Host "⚙️ Creating new Root-CA from FastAPI-DLS..." -ForegroundColor Yellow
-    ssh $LinuxUser@$LinuxHost "curl -k -o $RootCA https://$LinuxHost/-/config/root-certificate"
+# ----------------------- 4 Check Root-CA -----------------------
+Write-Host "`nChecking for Root-CA..." -ForegroundColor Cyan
+
+# формуємо чистий bash-рядок у змінній
+$checkCmd = "if [ -f '$RootCA' ]; then echo 1; else echo 0; fi"
+
+# передаємо як аргумент до bash -c, без подвійного цитування
+$exists = ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null `
+    -o PreferredAuthentications=password -o PubkeyAuthentication=no `
+    ${LinuxUser}@${LinuxHost} "bash -c '$checkCmd'"
+
+if ($exists -and $exists.Trim() -eq "1") {
+    Write-Host "Root-CA already exists" -ForegroundColor Green
+}
+else {
+    Write-Host "Creating new Root-CA from FastAPI-DLS..." -ForegroundColor Yellow
+    $createCmd = "curl -k -o '$RootCA' https://$LinuxHost/-/config/root-certificate"
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null `
+        -o PreferredAuthentications=password -o PubkeyAuthentication=no `
+        ${LinuxUser}@${LinuxHost} "bash -c '$createCmd'"
 }
 
-# ----------------------- 5️⃣ Copy $dllName to Linux -----------------------
-Write-Host "`n📤 Copying $dllName to $RemoteHostDir..." -ForegroundColor Cyan
-scp $dll.FullName $LinuxUser"@"$LinuxHost":"$RemoteDllPath
+# ----------------------- 5 Copy $dllName to Linux -----------------------
+Write-Host "`n Copying $dllName to $RemoteHostDir..." -ForegroundColor Cyan
+scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $dll.FullName "${LinuxUser}@${LinuxHost}:${RemoteDllPath}"
 
-# ----------------------- 6️⃣ Run patch -----------------------
-Write-Host "`n⚙️ Running patch on Linux..." -ForegroundColor Cyan
-ssh $LinuxUser@$LinuxHost "$Patcher -g $RemoteDllPath -c $RootCA"
+# ----------------------- 6 Run patch -----------------------
+Write-Host "`n Running patch on Linux..." -ForegroundColor Cyan
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${LinuxUser}@${LinuxHost} "$Patcher -g $RemoteDllPath -c $RootCA"
 
-# ----------------------- 7️⃣ Copy back -----------------------
-Write-Host "`n📥 Downloading patched file to $LocalOutPath..." -ForegroundColor Cyan
-scp $LinuxUser@$LinuxHost":"$RemoteDllPath "$LocalOutPath"
+# ----------------------- 7 Copy back -----------------------
+Write-Host "`n Downloading patched file to $LocalOutPath..." -ForegroundColor Cyan
+scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${LinuxUser}@${LinuxHost}:${RemoteDllPath} "$LocalOutPath"
 
+# ----------------------- 8 Replace the DLL -----------------------
 # Search for the DLL
-Write-Host "Searching for $dllName in $searchRoot..."
+Write-Host "Searching for $dllName in $searchRoot..." -ForegroundColor Cyan
 $dllPath = Get-ChildItem -Path $searchRoot -Recurse -Filter $dllName -ErrorAction SilentlyContinue | Select-Object -First 1
 
 # Stop NV service before replacing the DLL
@@ -117,20 +130,20 @@ if ($dllPath) {
 # Start the service after the replacement
 Start-Service NVDisplay.ContainerLocalSystem
 
-# ----------------------- 8️⃣ Getting Client Token -----------------------
-Write-Host "`n🔑 Get Client Token from FastAPI-DLS..." -ForegroundColor Cyan
+# ----------------------- 9 Getting Client Token -----------------------
+Write-Host "`n Get Client Token from FastAPI-DLS..." -ForegroundColor Cyan
 curl.exe --insecure -L -X GET "https://$LinuxHost/-/client-token" -o $TokenPath
-Write-Host "✅ Token saved in: $TokenPath"
+Write-Host " Token saved in: $TokenPath"
 
-# ----------------------- 9️⃣ Restart Nvidia -----------------------
-Write-Host "`n🔄 restart NVIDIA..." -ForegroundColor Cyan
+# ----------------------- 10 Restart Nvidia -----------------------
+Write-Host "`n restart NVIDIA..." -ForegroundColor Cyan
 Restart-Service NVDisplay.ContainerLocalSystem
 
-# ----------------------- 🔍 Check License -----------------------
-Write-Host "`n🔍 Check License NVIDIA..." -ForegroundColor Yellow
-sleep 120
-& 'nvidia-smi' -q | Select-String "License"
+# ----------------------- Check License -----------------------
+Write-Host "`n Check License NVIDIA..." -ForegroundColor Yellow
+sleep 60
+& nvidia-smi -q | Select-String "License"
 
-# ----------------------- ✅ Completion -----------------------
-Write-Host "`n✅ Operation completed successfully!" -ForegroundColor Green
-Write-Host "📁 Patch saved in: $LocalOutPath"
+# ----------------------- Completion -----------------------
+Write-Host "`n Operation completed successfully!" -ForegroundColor Green
+Write-Host "Patch saved in: $LocalOutPath"
