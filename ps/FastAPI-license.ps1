@@ -25,9 +25,9 @@ $replacementDll = "$HOME\Desktop\nvxdapix.dll"
 $logFile = "$HOME\dll_replacement_log.txt"
 # ===================================
 
-Write-Host "`n Windows host: $HostName" -ForegroundColor Cyan
-Write-Host " FastAPI-DLS server: $LinuxHost" -ForegroundColor Cyan
-Write-Host " Remote directory: $RemoteHostDir`n" -ForegroundColor Cyan
+Write-Host "Windows host: $HostName" -ForegroundColor Cyan
+Write-Host "FastAPI-DLS server: $LinuxHost" -ForegroundColor Cyan
+Write-Host "Remote directory: $RemoteHostDir`n" -ForegroundColor Cyan
 
 # ----------------------- 1 Check Linux server availability -----------------------
 Write-Host " Checking Linux server availability..." -ForegroundColor Cyan
@@ -37,7 +37,7 @@ if (-not (Test-Connection -ComputerName $LinuxHost -Count 1 -Quiet)) {
 }
 
 # ----------------------- 2 Search for $dllName -----------------------
-Write-Host "`n Searching for $dllName in DriverStore..." -ForegroundColor Cyan
+Write-Host "Searching for $dllName in DriverStore..." -ForegroundColor Cyan
 $dll = Get-ChildItem -Path $searchRoot -Recurse -Filter $dllName -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $dll) {
     Write-Host " $dllName not found." -ForegroundColor Red
@@ -51,7 +51,7 @@ $cmd = "mkdir -p '$RemoteHostDir'"
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${LinuxUser}@${LinuxHost} "bash -c '$cmd'"
 
 # ----------------------- 4 Check Root-CA -----------------------
-Write-Host "`nChecking for Root-CA..." -ForegroundColor Cyan
+Write-Host "Checking for Root-CA..." -ForegroundColor Cyan
 
 # формуємо чистий bash-рядок у змінній
 $checkCmd = "if [ -f '$RootCA' ]; then echo 1; else echo 0; fi"
@@ -73,15 +73,15 @@ else {
 }
 
 # ----------------------- 5 Copy $dllName to Linux -----------------------
-Write-Host "`n Copying $dllName to $RemoteHostDir..." -ForegroundColor Cyan
+Write-Host "Copying $dllName to $RemoteHostDir..." -ForegroundColor Cyan
 scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $dll.FullName "${LinuxUser}@${LinuxHost}:${RemoteDllPath}"
 
 # ----------------------- 6 Run patch -----------------------
-Write-Host "`n Running patch on Linux..." -ForegroundColor Cyan
+Write-Host "Running patch on Linux..." -ForegroundColor Cyan
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${LinuxUser}@${LinuxHost} "$Patcher -g $RemoteDllPath -c $RootCA"
 
 # ----------------------- 7 Copy back -----------------------
-Write-Host "`n Downloading patched file to $LocalOutPath..." -ForegroundColor Cyan
+Write-Host "Downloading patched file to $LocalOutPath..." -ForegroundColor Cyan
 scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${LinuxUser}@${LinuxHost}:${RemoteDllPath} "$LocalOutPath"
 
 # ----------------------- 8 Replace the DLL -----------------------
@@ -138,9 +138,9 @@ Write-Host "restart NVIDIA..." -ForegroundColor Cyan
 Restart-Service NVDisplay.ContainerLocalSystem
 
 # ----------------------- Check License -----------------------
-Write-Host " Check License NVIDIA..." -ForegroundColor Yellow
+Write-Host "Check License NVIDIA..." -ForegroundColor Yellow
 sleep 60
 & nvidia-smi -q | Select-String "License"
 
 # ----------------------- Completion -----------------------
-Write-Host "`n Operation completed successfully!" -ForegroundColor Green
+Write-Host "Operation completed successfully!" -ForegroundColor Green
