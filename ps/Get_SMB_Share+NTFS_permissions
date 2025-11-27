@@ -1,0 +1,51 @@
+<# 
+.SYNOPSIS
+    Export SMB Share permissions + NTFS permissions to CSV
+#>
+
+$shares = Get-SmbShare | Where-Object { $_.Name -notin 'IPC$', 'ADMIN$', 'C$' }
+
+$report = foreach ($s in $shares) {
+
+    # Share permissions
+    $shareAccess = Get-SmbShareAccess -Name $s.Name
+    foreach ($sa in $shareAccess) {
+        [PSCustomObject]@{
+            ShareName        = $s.Name
+            Path             = $s.Path
+            Type             = "Share"
+            Account          = $sa.AccountName
+            Rights           = $sa.AccessRight
+            AccessControl    = $sa.AccessControlType
+        }
+    }
+
+    # NTFS permissions
+    if ($s.Path -and (Test-Path $s.Path)) {
+        $ntfs = (Get-Acl $s.Path).Access
+        foreach ($na in $ntfs) {
+            [PSCustomObject]@{
+                ShareName        = $s.Name
+                Path             = $s.Path
+                Type             = "NTFS"
+                Account          = $na.IdentityReference
+                Rights           = $na.FileSystemRights
+                AccessControl    = $na.AccessControlType
+            }
+        }
+    }
+    else {
+        [PSCustomObject]@{
+            ShareName        = $s.Name
+            Path             = $s.Path
+            Type             = "NTFS"
+            Account          = "N/A"
+            Rights           = "Path not found"
+            AccessControl    = "N/A"
+        }
+    }
+}
+
+$report | Export-Csv "C:\Reports\FileServer_Permissions.csv" -NoTypeInformation -Encoding UTF8
+
+Write-Host "CSV created: C:\Reports\FileServer_Permissions.csv" -ForegroundColor Green
