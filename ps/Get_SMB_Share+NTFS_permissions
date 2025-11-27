@@ -1,51 +1,46 @@
-<# 
-.SYNOPSIS
-    Export SMB Share permissions + NTFS permissions to CSV
-#>
+$TargetShares = @(
+    "Finanzen",
+    "Geschaeftsleitung",
+    "Liegenschaften",
+    "Mitarbeiter",
+    "SB-Personal",
+    "Software",
+    "STB-Personal",
+    "WsusContent",
+    "WSUSTemp"
+)
 
-$shares = Get-SmbShare | Where-Object { $_.Name -notin 'IPC$', 'ADMIN$', 'C$' }
+$shares = Get-SmbShare | Where-Object { $TargetShares -contains $_.Name }
 
-$report = foreach ($s in $shares) {
+$result = foreach ($s in $shares) {
 
-    # Share permissions
-    $shareAccess = Get-SmbShareAccess -Name $s.Name
-    foreach ($sa in $shareAccess) {
-        [PSCustomObject]@{
-            ShareName        = $s.Name
-            Path             = $s.Path
-            Type             = "Share"
-            Account          = $sa.AccountName
-            Rights           = $sa.AccessRight
-            AccessControl    = $sa.AccessControlType
-        }
+    # --- SHARE PERMISSIONS ---
+    $sharePermsList = Get-SmbShareAccess -Name $s.Name | ForEach-Object {
+        "$($_.AccountName) ($($_.AccessRight))"
     }
+    $sharePerms = $sharePermsList -join "; "
 
-    # NTFS permissions
+    # --- NTFS PERMISSIONS ---
     if ($s.Path -and (Test-Path $s.Path)) {
-        $ntfs = (Get-Acl $s.Path).Access
-        foreach ($na in $ntfs) {
-            [PSCustomObject]@{
-                ShareName        = $s.Name
-                Path             = $s.Path
-                Type             = "NTFS"
-                Account          = $na.IdentityReference
-                Rights           = $na.FileSystemRights
-                AccessControl    = $na.AccessControlType
-            }
+
+        $ntfsPermsList = (Get-Acl $s.Path).Access | ForEach-Object {
+            "$($_.IdentityReference) ($($_.FileSystemRights))"
         }
+
+        $ntfsPerms = $ntfsPermsList -join "; "
     }
     else {
-        [PSCustomObject]@{
-            ShareName        = $s.Name
-            Path             = $s.Path
-            Type             = "NTFS"
-            Account          = "N/A"
-            Rights           = "Path not found"
-            AccessControl    = "N/A"
-        }
+        $ntfsPerms = "Path not found"
+    }
+
+    [PSCustomObject]@{
+        ShareName      = $s.Name
+        Path           = $s.Path
+        ShareAccounts  = $sharePerms
+        NTFSAccounts   = $ntfsPerms
     }
 }
 
-$report | Export-Csv "C:\Reports\FileServer_Permissions.csv" -NoTypeInformation -Encoding UTF8
+$result | Export-Csv "C:\Reports\DataShares_Permissions.csv" -Encoding UTF8 -NoTypeInformation
 
-Write-Host "CSV created: C:\Reports\FileServer_Permissions.csv" -ForegroundColor Green
+Write-Host "CSV created: C:\Reports\DataShares_Permissions.csv" -ForegroundColor Green
