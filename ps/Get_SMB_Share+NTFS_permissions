@@ -1,13 +1,7 @@
 $TargetShares = @(
     "Finanzen",
     "Geschaeftsleitung",
-    "Liegenschaften",
-    "Mitarbeiter",
-    "SB-Personal",
-    "Software",
-    "STB-Personal",
-    "WsusContent",
-    "WSUSTemp"
+    "Mitarbeiter"
 )
 
 $shares = Get-SmbShare | Where-Object { $TargetShares -contains $_.Name }
