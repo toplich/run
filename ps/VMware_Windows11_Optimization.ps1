@@ -64,6 +64,36 @@ Write-Host "Disabling Windows Tips..." -ForegroundColor Yellow
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v "SoftLandingEnabled" /t REG_DWORD /d 0 /f
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v "SubscribedContent-310093Enabled" /t REG_DWORD /d 0 /f
 
+# ========================================================
+# 10. REMOVE SAFE-TO-DELETE APPX PACKAGES
+# ========================================================
+
+Write-Host "Removing unnecessary AppX packages..." -ForegroundColor Yellow
+
+$packagesToRemove = @(
+    # Xbox packages
+    "Microsoft.Xbox.TCUI",
+    "Microsoft.XboxGamingOverlay",
+    "Microsoft.XboxIdentityProvider",
+    "Microsoft.XboxSpeechToTextOverlay",
+    # Gaming / consumer apps
+    "Microsoft.GamingApp",
+    "Microsoft.MicrosoftSolitaireCollection",
+    # Feedback / phone
+    "Microsoft.WindowsFeedbackHub",
+    "Microsoft.YourPhone",
+    # DevHome / non-business
+    "Microsoft.Windows.DevHome",
+    # Cross-device
+    "MicrosoftWindows.CrossDevice"
+)
+
+foreach ($pkg in $packagesToRemove) {
+    Write-Host "Removing $pkg..." -ForegroundColor DarkYellow
+    Get-AppxPackage -AllUsers -Name $pkg | Remove-AppxPackage -ErrorAction SilentlyContinue
+    Get-AppxProvisionedPackage -Online | Where-Object {$_.PackageName -like "$pkg*"} | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
+}
+
 # -------------------------------------------------
 # DONE
 # -------------------------------------------------
