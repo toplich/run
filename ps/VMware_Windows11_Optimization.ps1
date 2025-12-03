@@ -65,13 +65,6 @@ reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" 
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v "SubscribedContent-310093Enabled" /t REG_DWORD /d 0 /f
 
 # -------------------------------------------------
-# 10. Defender Optimization (safe — no disabling AV)
-# -------------------------------------------------
-#Write-Host "Optimizing Windows Defender scanning..." -ForegroundColor Yellow
-#reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Scan" /v "DisableScanningNetworkFiles" /t REG_DWORD /d 1 /f
-#reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Scan" /v "DisableArchiveScanning" /t REG_DWORD /d 1 /f
-
-# -------------------------------------------------
 # DONE
 # -------------------------------------------------
 Write-Host "Optimization Completed Successfully!" -ForegroundColor Green
