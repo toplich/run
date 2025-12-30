@@ -1,9 +1,9 @@
 <# 
 .SYNOPSIS
-  Maintenance workflow: check updates, DISM, SFC, install updates, reboot if needed, eventlog check, report.
+  Maintenance workflow: check updates, DISM, SFC, install updates, (optional) reboot, eventlog check, report.
 
 .NOTES
-  Local-debug first. Later you can wrap it with Invoke-Command (WinRM).
+  Local-debug first.
   Requires: Run as Administrator.
 #>
 
@@ -12,6 +12,10 @@ param(
   [int]$EventLogHoursBack = 6,
   [int]$RebootWaitTimeoutSec = 1800,   # 30 min
   [int]$RebootPollIntervalSec = 10,
+
+  # IMPORTANT for local debugging: reboot is OFF by default
+  [switch]$DoReboot,
+
   [switch]$ExportJson,
   [string]$ExportPath = "C:\Temp"
 )
@@ -19,16 +23,28 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# -------- Logging (file + transcript) --------
+$LogDir = Join-Path $ExportPath "MaintenanceLogs"
+if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir -Force | Out-Null }
+
+$RunStamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$LogFile = Join-Path $LogDir ("Maintenance_{0}_{1}.log" -f $env:COMPUTERNAME, $RunStamp)
+$TranscriptFile = Join-Path $LogDir ("Maintenance_{0}_{1}.transcript.txt" -f $env:COMPUTERNAME, $RunStamp)
+
+Start-Transcript -Path $TranscriptFile -Force | Out-Null
+
+function Write-Log {
+  param([Parameter(Mandatory)][string]$Message)
+  $ts = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+  $line = "[$ts] $Message"
+  Write-Host $line
+  Add-Content -Path $LogFile -Value $line -Encoding UTF8
+}
+
 function Assert-Admin {
   $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
     ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
   if (-not $isAdmin) { throw "Run PowerShell as Administrator." }
-}
-
-function Write-Log {
-  param([string]$Message)
-  $ts = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-  Write-Host "[$ts] $Message"
 }
 
 function Invoke-ExternalCommand {
@@ -38,98 +54,154 @@ function Invoke-ExternalCommand {
   )
   $p = Start-Process -FilePath $FilePath -ArgumentList $Arguments -Wait -PassThru -NoNewWindow
   return [pscustomobject]@{
-    FilePath = $FilePath
+    FilePath  = $FilePath
     Arguments = $Arguments
-    ExitCode = $p.ExitCode
+    ExitCode  = $p.ExitCode
+  }
+}
+
+function New-UpdateSession {
+  try {
+    return New-Object -ComObject "Microsoft.Update.Session"
+  } catch {
+    throw "Cannot create Windows Update COM session (Microsoft.Update.Session). Error: $($_.Exception.Message)"
   }
 }
 
 function Get-WindowsUpdates {
-  # Returns list of updates (not installed) using Windows Update API
-  $session  = New-Object -ComObject "Microsoft.Update.Session"
-  $searcher = $session.CreateUpdateSearcher()
-  # Not installed, not hidden
-  $criteria = "IsInstalled=0 and IsHidden=0"
-  $result = $searcher.Search($criteria)
-
+  # Always returns an array (possibly empty)
   $updates = @()
-  for ($i=0; $i -lt $result.Updates.Count; $i++) {
-    $u = $result.Updates.Item($i)
-    $kb = @()
-    try { $kb = @($u.KBArticleIDs) } catch {}
-    $updates += [pscustomobject]@{
-      Title = $u.Title
-      KBs   = ($kb -join ",")
-      IsDownloaded = [bool]$u.IsDownloaded
-      RebootRequired = [bool]$u.RebootRequired
-      Categories = (@($u.Categories) | ForEach-Object { $_.Name }) -join ", "
+
+  try {
+    $session  = New-UpdateSession
+    $searcher = $session.CreateUpdateSearcher()
+    $criteria = "IsInstalled=0 and IsHidden=0"
+    $result = $searcher.Search($criteria)
+
+    for ($i=0; $i -lt $result.Updates.Count; $i++) {
+      $u = $result.Updates.Item($i)
+
+      $kb = @()
+      try { $kb = @($u.KBArticleIDs) } catch { $kb = @() }
+
+      $catNames = @()
+      try { $catNames = @($u.Categories | ForEach-Object { $_.Name }) } catch { $catNames = @() }
+
+      $updates += [pscustomobject]@{
+        Title          = $u.Title
+        KBs            = ($kb -join ",")
+        IsDownloaded   = [bool]$u.IsDownloaded
+        RebootRequired = [bool]$u.RebootRequired
+        Categories     = ($catNames -join ", ")
+      }
     }
+  } catch {
+    # Keep script running; return empty array but log the issue
+    Write-Log "WARNING: Get-WindowsUpdates failed: $($_.Exception.Message)"
+    $updates = @()
   }
-  return $updates
+
+  return ,$updates
 }
 
 function Install-WindowsUpdates {
   param([switch]$DownloadIfNeeded)
 
-  $session  = New-Object -ComObject "Microsoft.Update.Session"
-  $searcher = $session.CreateUpdateSearcher()
-  $criteria = "IsInstalled=0 and IsHidden=0"
-  $searchResult = $searcher.Search($criteria)
+  try {
+    $session  = New-UpdateSession
+    $searcher = $session.CreateUpdateSearcher()
+    $criteria = "IsInstalled=0 and IsHidden=0"
+    $searchResult = $searcher.Search($criteria)
 
-  if ($searchResult.Updates.Count -eq 0) {
-    return [pscustomobject]@{
-      InstalledCount = 0
-      ResultCode = "NoUpdates"
-      RebootRequired = $false
-      HResult = $null
+    $availableCount = [int]$searchResult.Updates.Count
+    if ($availableCount -eq 0) {
+      return [pscustomobject]@{
+        AvailableCount   = 0
+        AttemptedCount   = 0
+        SucceededCount   = 0
+        FailedCount      = 0
+        ResultCode       = "NoUpdates"
+        RebootRequired   = $false
+        HResult          = $null
+      }
     }
-  }
 
-  # Build collection
-  $updatesToInstall = New-Object -ComObject "Microsoft.Update.UpdateColl"
-  for ($i=0; $i -lt $searchResult.Updates.Count; $i++) {
-    $u = $searchResult.Updates.Item($i)
+    $updatesToInstall = New-Object -ComObject "Microsoft.Update.UpdateColl"
+    for ($i=0; $i -lt $availableCount; $i++) {
+      $u = $searchResult.Updates.Item($i)
+      if (-not $u.EulaAccepted) { $u.AcceptEula() | Out-Null }
+      $null = $updatesToInstall.Add($u)
+    }
 
-    # Accept EULA if needed
-    if (-not $u.EulaAccepted) { $u.AcceptEula() | Out-Null }
+    if ($DownloadIfNeeded) {
+      try {
+        $downloader = $session.CreateUpdateDownloader()
+        $downloader.Updates = $updatesToInstall
+        $null = $downloader.Download()
+      } catch {
+        Write-Log "WARNING: Download step failed: $($_.Exception.Message)"
+      }
+    }
 
-    $null = $updatesToInstall.Add($u)
-  }
+    $installer = $session.CreateUpdateInstaller()
+    $installer.Updates = $updatesToInstall
+    $installResult = $installer.Install()
 
-  if ($DownloadIfNeeded) {
-    $downloader = $session.CreateUpdateDownloader()
-    $downloader.Updates = $updatesToInstall
-    $dl = $downloader.Download()
-    # Continue even if some failed; install may still proceed for others
-  }
+    $codeMap = @{
+      0="NotStarted";1="InProgress";2="Succeeded";3="SucceededWithErrors";4="Failed";5="Aborted"
+    }
 
-  $installer = $session.CreateUpdateInstaller()
-  $installer.Updates = $updatesToInstall
-  $installResult = $installer.Install()
+    # Count per-update results
+    $attempted = [int]$updatesToInstall.Count
+    $succ = 0
+    $fail = 0
+    for ($i=0; $i -lt $attempted; $i++) {
+      try {
+        $ur = $installResult.GetUpdateResult($i)
+        # OperationResultCode: 0..5 (same mapping)
+        if ([int]$ur.ResultCode -eq 2 -or [int]$ur.ResultCode -eq 3) { $succ++ }
+        elseif ([int]$ur.ResultCode -eq 4) { $fail++ }
+      } catch {
+        $fail++
+      }
+    }
 
-  # ResultCode: 0=NotStarted,1=InProgress,2=Succeeded,3=SucceededWithErrors,4=Failed,5=Aborted
-  $codeMap = @{
-    0="NotStarted";1="InProgress";2="Succeeded";3="SucceededWithErrors";4="Failed";5="Aborted"
-  }
-
-  return [pscustomobject]@{
-    InstalledCount = $installResult.Updates.Count
-    ResultCode = $codeMap[[int]$installResult.ResultCode]
-    RebootRequired = [bool]$installResult.RebootRequired
-    HResult = ("0x{0:X8}" -f ($installResult.HResult -band 0xFFFFFFFF))
+    return [pscustomobject]@{
+      AvailableCount   = $availableCount
+      AttemptedCount   = $attempted
+      SucceededCount   = $succ
+      FailedCount      = $fail
+      ResultCode       = $codeMap[[int]$installResult.ResultCode]
+      RebootRequired   = [bool]$installResult.RebootRequired
+      HResult          = ("0x{0:X8}" -f ($installResult.HResult -band 0xFFFFFFFF))
+    }
+  } catch {
+    return [pscustomobject]@{
+      AvailableCount   = $null
+      AttemptedCount   = 0
+      SucceededCount   = 0
+      FailedCount      = 0
+      ResultCode       = "Exception"
+      RebootRequired   = $false
+      HResult          = $null
+      Error            = $_.Exception.Message
+    }
   }
 }
 
 function Test-PendingReboot {
-  # Common pending reboot indicators
   $paths = @(
     "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending",
-    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired",
-    "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\PendingFileRenameOperations"
+    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"
   )
   foreach ($p in $paths) {
     if (Test-Path $p) { return $true }
   }
+
+  try {
+    $v = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager" -Name "PendingFileRenameOperations" -ErrorAction SilentlyContinue
+    if ($null -ne $v) { return $true }
+  } catch {}
   return $false
 }
 
@@ -140,9 +212,6 @@ function Wait-ForRebootCycle {
     [int]$PollSec
   )
   $deadline = (Get-Date).AddSeconds($TimeoutSec)
-
-  # Wait until system time is newer than start + some seconds (meaning it rebooted) OR until uptime reset
-  # Uptime via WMI:
   while ((Get-Date) -lt $deadline) {
     try {
       $os = Get-CimInstance Win32_OperatingSystem
@@ -151,7 +220,7 @@ function Wait-ForRebootCycle {
         return [pscustomobject]@{ RebootDetected = $true; LastBootUpTime = $lastBoot }
       }
     } catch {
-      # During reboot, CIM may fail; ignore and continue
+      # During reboot remote calls can fail -> ignore
     }
     Start-Sleep -Seconds $PollSec
   }
@@ -159,113 +228,137 @@ function Wait-ForRebootCycle {
 }
 
 function Get-CriticalEvents {
-  param(
-    [Parameter(Mandatory)][datetime]$Since
-  )
+  param([Parameter(Mandatory)][datetime]$Since)
+
   $filter = @{
-    LogName = @("System","Application")
-    Level   = 1,2  # 1=Critical, 2=Error
+    LogName   = @("System","Application")
+    Level     = 1,2  # 1=Critical, 2=Error
     StartTime = $Since
   }
-  $events = Get-WinEvent -FilterHashtable $filter -ErrorAction SilentlyContinue |
-    Select-Object TimeCreated, LogName, LevelDisplayName, ProviderName, Id, Message
 
-  return $events
+  try {
+    $events = Get-WinEvent -FilterHashtable $filter -ErrorAction SilentlyContinue |
+      Select-Object TimeCreated, LogName, LevelDisplayName, ProviderName, Id, Message
+    return ,@($events)
+  } catch {
+    Write-Log "WARNING: Get-WinEvent failed: $($_.Exception.Message)"
+    return ,@()
+  }
 }
 
 # ---------------- MAIN ----------------
-Assert-Admin
+try {
+  Assert-Admin
 
-$workflowStart = Get-Date
-$sinceForEvents = (Get-Date).AddHours(-1 * $EventLogHoursBack)
+  $workflowStart = Get-Date
+  $sinceForEvents = (Get-Date).AddHours(-1 * $EventLogHoursBack)
 
-Write-Log "Maintenance workflow started on $env:COMPUTERNAME"
-Write-Log "Collecting basic system info..."
+  Write-Log "Maintenance workflow started on $env:COMPUTERNAME"
+  Write-Log "Logs: $LogFile"
+  Write-Log "Transcript: $TranscriptFile"
 
-$osInfo = Get-CimInstance Win32_OperatingSystem
-$basicInfo = [pscustomobject]@{
-  ComputerName = $env:COMPUTERNAME
-  OS = $osInfo.Caption
-  Version = $osInfo.Version
-  LastBootUpTime = $osInfo.LastBootUpTime
-  WorkflowStart = $workflowStart
+  $osInfo = Get-CimInstance Win32_OperatingSystem
+  $basicInfo = [pscustomobject]@{
+    ComputerName   = $env:COMPUTERNAME
+    OS             = $osInfo.Caption
+    Version        = $osInfo.Version
+    LastBootUpTime = $osInfo.LastBootUpTime
+    WorkflowStart  = $workflowStart
+  }
+
+  Write-Log "Checking available updates..."
+  $updatesBefore = Get-WindowsUpdates
+  Write-Log ("Updates found: {0}" -f @($updatesBefore).Count)
+
+  Write-Log "Running DISM RestoreHealth..."
+  $dism = Invoke-ExternalCommand -FilePath "dism.exe" -Arguments "/Online /Cleanup-Image /RestoreHealth"
+  Write-Log "DISM exit code: $($dism.ExitCode)"
+
+  Write-Log "Running SFC /scannow..."
+  $sfc = Invoke-ExternalCommand -FilePath "sfc.exe" -Arguments "/scannow"
+  Write-Log "SFC exit code: $($sfc.ExitCode)"
+
+  Write-Log "Installing updates..."
+  $install = Install-WindowsUpdates -DownloadIfNeeded
+  Write-Log ("Install Result: {0} | Attempted={1} Succeeded={2} Failed={3} | RebootRequired={4} | HResult={5}" -f `
+    $install.ResultCode, $install.AttemptedCount, $install.SucceededCount, $install.FailedCount, $install.RebootRequired, $install.HResult)
+
+  if ($install.ResultCode -eq "Exception") {
+    Write-Log "WARNING: Install-WindowsUpdates exception: $($install.Error)"
+  }
+
+  $pendingReboot = Test-PendingReboot
+  $needsReboot = [bool]$install.RebootRequired -or [bool]$pendingReboot
+
+  $rebootInfo = $null
+  if ($needsReboot) {
+    Write-Log "Reboot required detected (WU=$($install.RebootRequired) PendingReboot=$pendingReboot)."
+
+    if ($DoReboot) {
+      Write-Log "DoReboot is ON -> restarting computer..."
+      $rebootStart = Get-Date
+      Restart-Computer -Force
+
+      Write-Log "Waiting for reboot cycle (timeout ${RebootWaitTimeoutSec}s)..."
+      $rebootInfo = Wait-ForRebootCycle -StartTime $rebootStart -TimeoutSec $RebootWaitTimeoutSec -PollSec $RebootPollIntervalSec
+      Write-Log "RebootDetected=$($rebootInfo.RebootDetected) LastBootUpTime=$($rebootInfo.LastBootUpTime)"
+    } else {
+      Write-Log "DoReboot is OFF (local debug) -> skipping Restart-Computer."
+    }
+  } else {
+    Write-Log "Reboot not required."
+  }
+
+  Write-Log "Reading critical/error events since $sinceForEvents ..."
+  $events = Get-CriticalEvents -Since $sinceForEvents
+  Write-Log ("Critical/Error events: {0}" -f @($events).Count)
+
+  Write-Log "Re-checking updates after installation..."
+  $updatesAfter = Get-WindowsUpdates
+  Write-Log ("Updates remaining: {0}" -f @($updatesAfter).Count)
+
+  $workflowEnd = Get-Date
+
+  $report = [pscustomobject]@{
+    BasicInfo              = $basicInfo
+    UpdatesBeforeCount     = @($updatesBefore).Count
+    UpdatesBefore          = $updatesBefore
+    DISM                   = $dism
+    SFC                    = $sfc
+    Install                = $install
+    PendingRebootDetected  = $pendingReboot
+    NeedsReboot            = $needsReboot
+    Reboot                 = $rebootInfo
+    UpdatesAfterCount      = @($updatesAfter).Count
+    UpdatesAfter           = $updatesAfter
+    CriticalEventsCount    = @($events).Count
+    CriticalEvents         = $events
+    WorkflowEnd            = $workflowEnd
+    DurationSec            = [int]([timespan]($workflowEnd - $workflowStart)).TotalSeconds
+    LogFile                = $LogFile
+    TranscriptFile         = $TranscriptFile
+  }
+
+  Write-Host ""
+  Write-Host "===== MAINTENANCE SUMMARY ($env:COMPUTERNAME) ====="
+  Write-Host ("Updates before: {0} | after: {1}" -f $report.UpdatesBeforeCount, $report.UpdatesAfterCount)
+  Write-Host ("DISM exit: {0} | SFC exit: {1}" -f $report.DISM.ExitCode, $report.SFC.ExitCode)
+  Write-Host ("Install: {0} | Attempted: {1} | Succeeded: {2} | Failed: {3}" -f $report.Install.ResultCode, $report.Install.AttemptedCount, $report.Install.SucceededCount, $report.Install.FailedCount)
+  Write-Host ("NeedsReboot: {0} (PendingReboot={1}) | DoReboot: {2}" -f $report.NeedsReboot, $report.PendingRebootDetected, [bool]$DoReboot)
+  Write-Host ("Critical/Error events: {0}" -f $report.CriticalEventsCount)
+  Write-Host ("Duration (sec): {0}" -f $report.DurationSec)
+  Write-Host ("LogFile: {0}" -f $report.LogFile)
+  Write-Host ("Transcript: {0}" -f $report.TranscriptFile)
+
+  if ($ExportJson) {
+    if (-not (Test-Path $ExportPath)) { New-Item -ItemType Directory -Path $ExportPath -Force | Out-Null }
+    $file = Join-Path $ExportPath ("MaintenanceReport_{0}_{1}.json" -f $env:COMPUTERNAME, $RunStamp)
+    $report | ConvertTo-Json -Depth 6 | Out-File -FilePath $file -Encoding UTF8
+    Write-Log "Report exported: $file"
+  }
+
+  $report
 }
-
-Write-Log "Checking available updates..."
-$updatesBefore = Get-WindowsUpdates
-Write-Log ("Updates found: {0}" -f $updatesBefore.Count)
-
-Write-Log "Running DISM RestoreHealth..."
-$dism = Invoke-ExternalCommand -FilePath "dism.exe" -Arguments "/Online /Cleanup-Image /RestoreHealth"
-Write-Log "DISM exit code: $($dism.ExitCode)"
-
-Write-Log "Running SFC /scannow..."
-$sfc = Invoke-ExternalCommand -FilePath "sfc.exe" -Arguments "/scannow"
-Write-Log "SFC exit code: $($sfc.ExitCode)"
-
-Write-Log "Installing updates..."
-$install = Install-WindowsUpdates -DownloadIfNeeded
-Write-Log "Install Result: $($install.ResultCode), RebootRequired=$($install.RebootRequired), HResult=$($install.HResult)"
-
-$pendingReboot = Test-PendingReboot
-$needsReboot = $install.RebootRequired -or $pendingReboot
-
-$rebootInfo = $null
-if ($needsReboot) {
-  Write-Log "Reboot required -> restarting computer..."
-  $rebootStart = Get-Date
-  Restart-Computer -Force
-
-  # After this line, in local session you may lose console if remote; for local it continues only if script is scheduled.
-  # For LOCAL DEBUG: comment Restart-Computer and test reboot detection with a manual reboot.
-
-  Write-Log "Waiting for reboot cycle (timeout ${RebootWaitTimeoutSec}s)..."
-  $rebootInfo = Wait-ForRebootCycle -StartTime $rebootStart -TimeoutSec $RebootWaitTimeoutSec -PollSec $RebootPollIntervalSec
-  Write-Log "RebootDetected=$($rebootInfo.RebootDetected) LastBootUpTime=$($rebootInfo.LastBootUpTime)"
-} else {
-  Write-Log "Reboot not required."
+finally {
+  Stop-Transcript | Out-Null
 }
-
-Write-Log "Reading critical/error events since $sinceForEvents ..."
-$events = Get-CriticalEvents -Since $sinceForEvents
-Write-Log ("Critical/Error events: {0}" -f ($events.Count))
-
-Write-Log "Re-checking updates after installation..."
-$updatesAfter = Get-WindowsUpdates
-Write-Log ("Updates remaining: {0}" -f $updatesAfter.Count)
-
-$workflowEnd = Get-Date
-
-$report = [pscustomobject]@{
-  BasicInfo = $basicInfo
-  UpdatesBeforeCount = $updatesBefore.Count
-  UpdatesBefore = $updatesBefore
-  DISM = $dism
-  SFC  = $sfc
-  Install = $install
-  PendingRebootDetected = $pendingReboot
-  Reboot = $rebootInfo
-  UpdatesAfterCount = $updatesAfter.Count
-  UpdatesAfter = $updatesAfter
-  CriticalEventsCount = $events.Count
-  CriticalEvents = $events
-  WorkflowEnd = $workflowEnd
-  DurationSec = [int]([timespan]($workflowEnd - $workflowStart)).TotalSeconds
-}
-
-Write-Host ""
-Write-Host "===== MAINTENANCE SUMMARY ($env:COMPUTERNAME) ====="
-Write-Host ("Updates before: {0} | after: {1}" -f $report.UpdatesBeforeCount, $report.UpdatesAfterCount)
-Write-Host ("DISM exit: {0} | SFC exit: {1}" -f $report.DISM.ExitCode, $report.SFC.ExitCode)
-Write-Host ("Install: {0} | RebootRequired: {1} | PendingReboot: {2}" -f $report.Install.ResultCode, $needsReboot, $report.PendingRebootDetected)
-Write-Host ("Critical/Error events: {0}" -f $report.CriticalEventsCount)
-Write-Host ("Duration (sec): {0}" -f $report.DurationSec)
-
-if ($ExportJson) {
-  if (-not (Test-Path $ExportPath)) { New-Item -ItemType Directory -Path $ExportPath -Force | Out-Null }
-  $file = Join-Path $ExportPath ("MaintenanceReport_{0}_{1}.json" -f $env:COMPUTERNAME, (Get-Date -Format "yyyyMMdd_HHmmss"))
-  $report | ConvertTo-Json -Depth 6 | Out-File -FilePath $file -Encoding UTF8
-  Write-Log "Report exported: $file"
-}
-
-return $report
