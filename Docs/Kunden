@@ -1,0 +1,172 @@
+1. Übersicht
+Standort(e)	<Ort>
+Mitarbeiter 	<Anzahl>
+Standorte 	<Anzahl / Ort>
+Internet 	<ISP / Bandbreite>
+Firewall 	<Modell>
+Server 	<On-Prem / Cloud>
+Backup 	<Lösung>
+M365 	Ja / Nein
+
+
+Kontakte
+Rolle 	Name   	Telefone	Mail
+Kunde 	<Name>	<Telefone>	<Mail>
+IT    	<Name>	<Telefone>	<Mail>
+
+2. Netzwerkplan
+Schem
+VLAN	Zweck	Subnetz 	Gateway	DNS	DHCP
+1	WAN	172.16.16.16	172.16.16.1	8.8.8.8	Nein
+10	LAN	192.168.10.0/24	192.168.10.1	192.168.10.10
+	Ja
+20	Server	192.168.20.0/24	192.168.20.1	192.168.10.10	Ja
+30	VPN	192.168.30.0/24	192.168.30.1	8.8.8.8	Ja
+40	Guest	192.168.40.1/24	192.168.30.1	8.8.8.8	Ja
+			
+3. Geräte
+3.1 Netzwerkgeräte
+(FW - Firewalls / SW - Swithes / AP - Access Points / DR - Druker Tabelle)
+Gerät    	Hersteller	Modell       	IP	VLAN	Standort 	Bemerkung 
+FW-01	SonicWall 	TZ270	x.x.x.x	10,20,30	Büro     	VPN aktiv
+SW-01	Ubiquiti 		x.x.x.x	10,20,30	ServerRaum	
+AP-01	UniFi		x.x.x.x	20	Rezeption	
+DRK-01	OKI		x.x.x.x	10	Rezeption	
+NAS-01	Synology		x.x.x.x	30	ServerRaum	
+
+3.1 Physische Server
+Host-ID	Hostname	Hersteller 	Modell	OS	CPU / RAM	Storages	IP (Mgmt)	Standort	Rolle	Bemerkung  
+PS-01	ESXI-01	HPE	DL380 Gen10	ESXI 8	2×Xeon / 128 GB	RAID0 (2*2TB SATA)	192.168.10.5	Serverraum 	Virtualisierung 	
+						NVME 4Tb
+PS-02	NAS-01	Synology  	RS1221+	DSM    		RAID1 (2*8TB SATA)	192.168.10.10	Serverraum 	Backup          	
+
+3.2 Virtuelle Server 
+VM-Name	Hostname	Host	OS	Rolle	VCPU / RAM	Storage	IP	Bemerkung
+VM-SRV-01	SRV-DC  	ESXi-01	WinServer 2022	AD / DNS	4 /16Gb	90Gb	192.168.20.15	
+VM-SRV-02	SRV-SQL	ESXi-01	WinServer 2022	SQL	6 / 32Gb	120Gb	192.168.20.20	
+
+3.3 Clients 
+(PC - Personal Computer / TC - Thin Client TC / NB - Notebook)
+Mitarbeiter	Hostname	OS	User	CPU / RAM	Storage	IP	Bemerkung
+Müller 	PC-Muler		Muller	Core i9 /16Gb	SATA 1Tb	192.168.10.51	
+Meier  	TC-Meier		Meier	ARM / 8Gb	NVME 32Gb	192.168.10.52	
+Keller 	NB-Keller		Keller	Core i7 / 16Gb	SSD 480Gb	192.168.10.53	
+
+3.4 Virtuelle Arbeitsplätze
+VM-Name	Hostname	Host	OS	Zugriff	VCPU / RAM	Storage	IP	Bemerkung
+VM-WKS-01 	VM-Muler	ESXi-01	Win 11	RDP	4 / 8Gb	60 Gb	192.168.20.15	
+VM-WKS-02	VM-Meier	ESXi-01	Win 11	RDP	4 / 8Gb	60Gb	192.168.20.15	
+
+4. Umgebungs
+Domäne
+Punkt             	Beschreibung                  
+Domänenname       	`firma.local` / `firma.ch`
+Domänentyp        	On-Prem / Hybrid / Cloud
+Domain Controller	SRV-DC01, SRV-DC02
+DC OS-Version	Windows Server 2022
+FSMO-Rollen	SRV-DC01
+
+WICHTIG (sehr empfohlen)
+ Anzahl Benutzer / Computer
+ OU-Struktur (kurz)
+ Kritische GPOs
+
+Microsoft 365
+Punkt          	Beschreibung          
+Tenant Name	firma.onmicrosoft.com
+Hauptdomain    	firma.ch 
+Tenant-ID	GUID                  
+Lizenzmodell   	Business Premium 
+Benutzeranzahl 	25
+MFA	Aktiv (alle Admins)
+Admin-Konten 	Global Admin (Anzahl)
+
+Dienst          	Status 
+Exchange Online	On-Prem / Hybrid / Cloud
+SharePoint 	nein
+OneDrive 	aktiv
+Teams           	aktiv
+Entra ID	Nein
+
+
+Backup
+Bereich 	Lösung 	Ziel  	Retention 
+Server  	Altaro	NAS   	30 Tage
+M365    	Altaro	Cloud 	1 Jahr
+Clients 	Nein   		
+
+5. Prozess
+5.1 Backup & Restore
+Backup täglich um 22:00
+ Restore-Test monatlich
+ Verantwortlich: IT
+
+5.2 User On- / Offboarding
+Onboarding:
+ AD User
+ Mailbox
+ Gruppen
+ VPN
+ 
+Offboarding:
+ Konto deaktivieren
+ Daten sichern
+ Geräte sperren
+
+5.3 Updates & Wartung
+Windows Updates: monatlich
+ Firewall Firmware: jährlich / bei Bedarf
+
+6. Berechtigungs
+Grundprinzip
+Zugriffe werden grundsätzlich über Gruppen vergeben. Direkte Benutzerberechtigungen werden vermieden.
+6.1 Benutzergruppen (AD / Entra)
+Gruppe    	Typ	Zugriff          
+Users     	User	Standard User 
+IT-Admins	Admin	Server, Firewall 
+VPN-Users 	User	SSL VPN
+RDS-Users	User	RDP / VDI
+
+6.2 Admin-gruppen
+Gruppe             	Bereich        
+Domain Admins	AD             
+Server Admins	Windows Server
+M365 Global Admins	Microsoft 365
+Backup Admins	Backup-System
+
+6.3 Systemzugriffe
+System            	Gruppe 
+Firewall          	 IT-Admins
+Switches          	 IT-Admins
+ESXi / Hypervisor	Server Admins
+NAS               	Backup Admins
+
+6.4 Server / Dienste
+System            	Zugriff       
+Domain Controller	Domain Admins
+File Server 	Users
+SQL Server	SQL Admins
+RDS	RDS-Users
+
+6.5 Remote-Zugriffe
+Zugriff       	Gruppe       	Bemerkung 
+VPN	VPN-Users	MFA
+RDP	RDS-Users	Intern    
+Admin-Zugriff	 IT-Admins	MFA
+
+6.6 Microsoft 365 Zugriffe
+Rolle            	Anzahl 	MFA 
+Global Admin	2	JA
+Exchange Admin	1	JA
+SharePoint Admin	1	JA
+
+6.7 Externe Zugriffe
+Typ          	Wer        	Zugriff     
+Partner      	MSP        	VPN / Admin 
+Externe User 	Gast       	SharePoint
+Support      	Hersteller 	Temporär    
+
+
+
+
+
