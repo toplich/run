@@ -7,6 +7,15 @@
 #>
 
 # ============================================
+# COMMAND LINE PARAMETERS (MUST BE FIRST!)
+# ============================================
+
+param(
+    [Parameter(Position=0)]
+    [string]$Function = ""
+)
+
+# ============================================
 # CHECK ADMINISTRATOR RIGHTS
 # ============================================
 
@@ -15,7 +24,7 @@ $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIde
 if (-NOT $isAdmin) {
     Write-Host "This script requires Administrator privileges. Restarting..." -ForegroundColor Yellow
     $scriptPath = $MyInvocation.MyCommand.Path
-    if (-not $scriptPath) { $scriptPath = ".\DiskCleanup.ps1" }
+    if (-not $scriptPath) { $scriptPath = ".\Win11_DiskCleanup.ps1" }
     Start-Process PowerShell -Verb RunAs -ArgumentList "-ExecutionPolicy Bypass -File `"$scriptPath`""
     exit
 }
@@ -49,7 +58,6 @@ function Get-DiskUsage {
 function Clean-TemporaryFiles {
     Write-Host "`n=== CLEANING TEMPORARY FILES ===" -ForegroundColor Magenta
     
-    # Windows Temp folders
     $tempPaths = @(
         "$env:TEMP",
         "$env:WINDIR\Temp",
@@ -140,7 +148,6 @@ function Clean-BrowserCache {
         $path = $browsers[$browser]
         if (Test-Path $path) {
             if ($browser -eq "Firefox") {
-                # Firefox has random profile folder names
                 $profiles = Get-ChildItem "$env:APPDATA\Mozilla\Firefox\Profiles\*.default-release\cache" -ErrorAction SilentlyContinue
                 foreach ($profile in $profiles) {
                     $sizeBefore = (Get-ChildItem $profile -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
@@ -181,7 +188,6 @@ function Clean-DeliveryOptimization {
 function Clean-WindowsLogs {
     Write-Host "`n=== CLEANING WINDOWS LOGS ===" -ForegroundColor Magenta
     
-    # Clean Event Logs
     wevtutil el | ForEach-Object {
         try {
             wevtutil cl $_ -ErrorAction SilentlyContinue
@@ -189,7 +195,6 @@ function Clean-WindowsLogs {
     }
     Write-Host "  Cleaned: Windows Event Logs" -ForegroundColor DarkYellow
     
-    # Clean CBS logs
     $cbsLogs = "$env:WINDIR\Logs\CBS"
     if (Test-Path $cbsLogs) {
         Get-ChildItem $cbsLogs -Filter "*.log" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
@@ -204,11 +209,7 @@ function Clean-DISM {
     
     Write-Host "  This may take a few minutes..." -ForegroundColor DarkYellow
     
-    # Remove old Windows updates and components
     dism /online /Cleanup-Image /StartComponentCleanup /ResetBase /quiet 2>&1 | Out-Null
-    
-    # Analyze and clean WinSxS
-    dism /online /Cleanup-Image /AnalyzeComponentStore 2>&1 | Out-Null
     
     Write-Host "[OK] DISM cleanup completed" -ForegroundColor Green
 }
@@ -308,13 +309,8 @@ AVAILABLE FUNCTIONS:
 }
 
 # ============================================
-# COMMAND LINE PARAMETERS
+# MAIN LOGIC (PARAMETER HANDLING)
 # ============================================
-
-param(
-    [Parameter(Position=0)]
-    [string]$Function = ""
-)
 
 if ($Function) {
     switch ($Function.ToLower()) {
@@ -324,10 +320,12 @@ if ($Function) {
         "recycle" { Clean-RecycleBin }
         "downloads" { Clean-DownloadsFolder }
         "browser" { Clean-BrowserCache }
-        "windowslogs" { Clean-WindowsLogs }
+        "delivery" { Clean-DeliveryOptimization }
+        "logs" { Clean-WindowsLogs }
         "dism" { Clean-DISM }
+        "duplicates" { Clean-DuplicateFiles }
         "full" { Run-FullCleanup }
-        default { Write-Host "Unknown function. Options: status, temp, prefetch, recycle, downloads, browser, windowslogs, dism, full" -ForegroundColor Red }
+        default { Write-Host "Unknown function. Options: status, temp, prefetch, recycle, downloads, browser, delivery, logs, dism, duplicates, full" -ForegroundColor Red }
     }
     exit 0
 }
