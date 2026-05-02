@@ -1,147 +1,125 @@
 <#
 .SYNOPSIS
-    Windows Laptop Optimization Script (Modular)
+    Windows Laptop Optimizer (for Windows PowerShell 5.1)
 .DESCRIPTION
-    Кожну оптимізацію можна запустити окремо. Обов'язковий блок: Telemetry Removal.
-    Запуск: .\optimize.ps1 -Function All
-    Або: .\optimize.ps1 -Function Telemetry, Privacy, BackgroundApps
+    Modular script for Windows optimization and privacy protection
 #>
 
 # ============================================
-# Адміністратор?
+# CHECK AND ELEVATE TO ADMINISTRATOR
 # ============================================
-if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Host "Запустіть PowerShell як Адміністратор!" -ForegroundColor Red
-    exit 1
+
+$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
+
+if (-NOT $isAdmin) {
+    Write-Host "This script requires Administrator privileges. Restarting..." -ForegroundColor Yellow
+    $scriptPath = $MyInvocation.MyCommand.Path
+    if (-not $scriptPath) { $scriptPath = ".\Win11_optimise.ps1" }
+    Start-Process PowerShell -Verb RunAs -ArgumentList "-ExecutionPolicy Bypass -File `"$scriptPath`""
+    exit
 }
 
+Write-Host "Running as Administrator - OK" -ForegroundColor Green
+
 # ============================================
-# ОСНОВНІ ФУНКЦІЇ
+# MAIN FUNCTIONS
 # ============================================
 
 function Disable-Telemetry {
-    Write-Host "`n=== ВИМІКНЕННЯ ТЕЛЕМЕТРІЇ (СТЕЖЕННЯ) ===" -ForegroundColor Magenta
+    Write-Host "`n=== DISABLING TELEMETRY & TRACKING ===" -ForegroundColor Magenta
     
-    # Рівень телеметрії: 0 - Безпека (мінімум)
+    # Telemetry level: 0 - Security (minimum)
     reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" /v "AllowTelemetry" /t REG_DWORD /d 0 /f
     reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection" /v "AllowTelemetry" /t REG_DWORD /d 0 /f
     
-    # Вимкнути рекламні ID
+    # Disable advertising ID
     reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo" /v "DisabledByGroupPolicy" /t REG_DWORD /d 1 /f
     reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo" /v "Enabled" /t REG_DWORD /d 0 /f
     
-    # Вимкнути WiFi Sense та збір даних про мережі
+    # Disable WiFi Sense and network data collection
     reg add "HKLM\SOFTWARE\Microsoft\PolicyManager\default\WiFi\AllowWiFiHotSpotReporting" /v "value" /t REG_DWORD /d 0 /f
     reg add "HKLM\SOFTWARE\Microsoft\WcmSvc\wifinetworkmanager\config" /v "AutoConnectAllowedOEM" /t REG_DWORD /d 0 /f
     
-    # Вимкнути handwriting data sharing
+    # Disable handwriting data sharing
     reg add "HKCU\SOFTWARE\Microsoft\InputPersonalization" /v "RestrictImplicitTextCollection" /t REG_DWORD /d 1 /f
     reg add "HKCU\SOFTWARE\Microsoft\InputPersonalization" /v "RestrictImplicitInkCollection" /t REG_DWORD /d 1 /f
     
-    # Вимкнути Tailored Experiences
+    # Disable Tailored Experiences
     reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy" /v "TailoredExperiencesWithDiagnosticDataEnabled" /t REG_DWORD /d 0 /f
     
-    # Вимкнути Find My Device
+    # Disable Find My Device
     reg add "HKLM\SOFTWARE\Microsoft\Settings\FindMyDevice" /v "LocationSyncEnabled" /t REG_DWORD /d 0 /f
     
-    # Вимкнути реєстрацію натискань клавіш (key logging - так, Windows це збирає за замовчуванням)
-    reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\FontManagement" /v "FontProviders" /t REG_DWORD /d 0 /f
-    
-    # Вимкнути Cortana повністю
+    # Disable Cortana completely
     reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowCortana" /t REG_DWORD /d 0 /f
     reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowCortanaAboveLock" /t REG_DWORD /d 0 /f
     
-    # Вимкнути збір даних про мову вводу
-    reg add "HKCU\SOFTWARE\Microsoft\InputPersonalization" /v "RestrictImplicitTextCollection" /t REG_DWORD /d 1 /f
-    
-    # Вимкнути оновлення через peer-to-peer (оновлення не шаряться)
+    # Disable P2P updates (Delivery Optimization)
     reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config" /v "DODownloadMode" /t REG_DWORD /d 0 /f
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization" /v "DODownloadMode" /t REG_DWORD /d 0 /f
     
-    Write-Host "[OK] Телеметрія вимкнена" -ForegroundColor Green
+    Write-Host "[OK] Telemetry disabled" -ForegroundColor Green
 }
 
 function Disable-PrivacyServices {
-    Write-Host "`n=== ВИМІКНЕННЯ ПРИВАТНИХ СЛУЖБ ===" -ForegroundColor Magenta
+    Write-Host "`n=== DISABLING TRACKING SERVICES ===" -ForegroundColor Magenta
     
-    # Служби стеження
     $services = @(
         "DiagTrack",           # Connected User Experiences and Telemetry
         "dmwappushservice",    # Device Management WAP Push
         "WMPNetworkSvc",       # Windows Media Player Network Sharing
-        "RemoteRegistry",      # Віддалений реєстр
+        "RemoteRegistry",      # Remote Registry access
         "lfsvc",               # Geolocation Service
         "MapsBroker",          # Downloaded Maps Manager
         "PcaSvc",              # Program Compatibility Assistant
-        "WSearch",             # Windows Search (за бажанням, але вимкнемо)
-        "SysMain"              # Superfetch (економить ресурси)
+        "SysMain"              # Superfetch (saves resources)
     )
     
     foreach ($svc in $services) {
         Stop-Service $svc -ErrorAction SilentlyContinue
         Set-Service $svc -StartupType Disabled -ErrorAction SilentlyContinue
-        Write-Host "  Stop & Disabled: $svc" -ForegroundColor DarkYellow
+        Write-Host "  Disabled: $svc" -ForegroundColor DarkYellow
     }
     
-    # Вимкнути Windows Error Reporting
+    # Disable Windows Error Reporting
     reg add "HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting" /v "Disabled" /t REG_DWORD /d 1 /f
     
-    Write-Host "[OK] Служби стеження вимкнені" -ForegroundColor Green
+    Write-Host "[OK] Tracking services disabled" -ForegroundColor Green
 }
 
 function Disable-TrackingTasks {
-    Write-Host "`n=== ВИМІКНЕННЯ ЗАПЛАНОВАНИХ ЗАВДАНЬ СТЕЖЕННЯ ===" -ForegroundColor Magenta
+    Write-Host "`n=== DISABLING SCHEDULED TRACKING TASKS ===" -ForegroundColor Magenta
     
-    $tasks = @(
-        "Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser",
-        "Microsoft\Windows\Application Experience\ProgramDataUpdater",
-        "Microsoft\Windows\Application Experience\StartupAppTask",
-        "Microsoft\Windows\Customer Experience Improvement Program\Consolidator",
-        "Microsoft\Windows\Customer Experience Improvement Program\UsbCeip",
-        "Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector",
-        "Microsoft\Windows\Feedback\Siuf\DmClient",
-        "Microsoft\Windows\Feedback\Siuf\DmClientOnScenarioDownload",
-        "Microsoft\Windows\Location\Notifications",
-        "Microsoft\Windows\Maps\MapsToastTask",
-        "Microsoft\Windows\Maps\MapsUpdateTask",
-        "Microsoft\Windows\NetCfg\BindingWorkItem",
-        "Microsoft\Windows\NetCfg\Dummy",
-        "Microsoft\Windows\PI\Sqm-Tasks",
-        "Microsoft\Windows\Power Efficiency Diagnostics\AnalyzeSystem",
-        "Microsoft\Windows\Windows Error Reporting\QueueReporting"
+    $taskNames = @(
+        "Microsoft Compatibility Appraiser",
+        "ProgramDataUpdater",
+        "StartupAppTask",
+        "Consolidator",
+        "UsbCeip",
+        "Microsoft-Windows-DiskDiagnosticDataCollector",
+        "DmClient",
+        "DmClientOnScenarioDownload",
+        "Notifications",
+        "MapsToastTask",
+        "MapsUpdateTask",
+        "BindingWorkItem",
+        "Dummy",
+        "Sqm-Tasks",
+        "AnalyzeSystem",
+        "QueueReporting"
     )
     
-    foreach ($task in $tasks) {
-        Disable-ScheduledTask -TaskPath "\$($task.Split('\')[0])" -TaskName $task.Split('\')[-1] -ErrorAction SilentlyContinue
-        Write-Host "  Disabled: $task" -ForegroundColor DarkYellow
+    foreach ($taskName in $taskNames) {
+        Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue | Disable-ScheduledTask -ErrorAction SilentlyContinue
+        Write-Host "  Disabled: $taskName" -ForegroundColor DarkYellow
     }
     
-    Write-Host "[OK] Заплановані завдання стеження вимкнені" -ForegroundColor Green
+    Write-Host "[OK] Scheduled tracking tasks disabled" -ForegroundColor Green
 }
 
-function Disable-OneDrive {
-    Write-Host "`n=== ВИДАЛЕННЯ ONEDRIVE ===" -ForegroundColor Magenta
+function Remove-Bloatware {
+    Write-Host "`n=== REMOVING BLOATWARE APPS ===" -ForegroundColor Magenta
     
-    # Зупинити процес
-    Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
-    
-    # Вимкнути автозавантаження
-    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /v "OneDriveSetup" /t REG_SZ /d "" /f
-    
-    # Видалити OneDrive
-    $onedrive = "$env:SYSTEMROOT\SysWOW64\OneDriveSetup.exe"
-    if (Test-Path $onedrive) {
-        Start-Process $onedrive -ArgumentList "/uninstall" -NoNewWindow -Wait
-        Write-Host "  OneDrive видалено" -ForegroundColor Green
-    }
-    
-    # Видалити залишки з реєстру
-    reg delete "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /f -ErrorAction SilentlyContinue
-}
-
-function Optimize-Performance {
-    Write-Host "`n=== ОПТИМІЗАЦІЯ ПРОДУКТИВНОСТІ ===" -ForegroundColor Magenta
-    
-    # Видалити непотрібні AppX (соціальні/ігрові)
     $bloatware = @(
         "Microsoft.BingNews",
         "Microsoft.BingWeather",
@@ -176,94 +154,110 @@ function Optimize-Performance {
     )
     
     foreach ($app in $bloatware) {
-        Get-AppxPackage -AllUsers -Name $app | Remove-AppxPackage -ErrorAction SilentlyContinue
+        Get-AppxPackage -Name $app -AllUsers | Remove-AppxPackage -ErrorAction SilentlyContinue
         Write-Host "  Removed: $app" -ForegroundColor DarkYellow
     }
     
-    # Вимкнути анімації (пришвидшує)
-    reg add "HKCU\Control Panel\Desktop" /v "UserPreferencesMask" /t REG_BINARY /d "9012038010000000" /f
-    reg add "HKCU\Control Panel\Desktop\WindowMetrics" /v "MinAnimate" /t REG_SZ /d "0" /f
-    
-    # План живлення: Збалансований (для ноутбука)
-    powercfg /setactive SCHEME_BALANCED
-    
-    # Вимкнути індексацію для SSD
-    $drives = Get-WmiObject Win32_LogicalDisk | Where-Object {$_.DriveType -eq 3}
-    foreach ($drive in $drives) {
-        if ($drive.MediaType -eq 12) { # SSD
-            Disable-MMAgent -MemoryCompression -ErrorAction SilentlyContinue
-            fsutil behavior set DisableLastAccess 1
-        }
-    }
-    
-    Write-Host "[OK] Оптимізація продуктивності завершена" -ForegroundColor Green
+    Write-Host "[OK] Bloatware apps removed" -ForegroundColor Green
 }
 
-function Disable-GameDVR {
-    Write-Host "`n=== ВИМІКНЕННЯ GAMEDVR ===" -ForegroundColor Magenta
+function Optimize-Performance {
+    Write-Host "`n=== PERFORMANCE OPTIMIZATION ===" -ForegroundColor Magenta
     
+    # Disable GameDVR
     reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\GameDVR" /v "AppCaptureEnabled" /t REG_DWORD /d 0 /f
     reg add "HKCU\System\GameConfigStore" /v "GameDVR_Enabled" /t REG_DWORD /d 0 /f
     reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\GameDVR" /v "AllowGameDVR" /t REG_DWORD /d 0 /f
     
-    Write-Host "[OK] GameDVR вимкнено" -ForegroundColor Green
-}
-
-function Disable-WebSearch {
-    Write-Host "`n=== ВИМІКНЕННЯ ВЕБ-ПОШУКУ В МЕНЮ ПУСК ===" -ForegroundColor Magenta
-    
+    # Disable web search in Start Menu
     reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "DisableWebSearch" /t REG_DWORD /d 1 /f
     reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowSearchToUseLocation" /t REG_DWORD /d 0 /f
-    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "ConnectedSearchUseWeb" /t REG_DWORD /d 0 /f
     
-    Write-Host "[OK] Веб-пошук вимкнено" -ForegroundColor Green
+    # Power plan: Balanced (for laptops)
+    powercfg /setactive SCHEME_BALANCED
+    
+    # Disable animations (speeds up weak laptops)
+    reg add "HKCU\Control Panel\Desktop" /v "UserPreferencesMask" /t REG_BINARY /d "9012038010000000" /f
+    reg add "HKCU\Control Panel\Desktop\WindowMetrics" /v "MinAnimate" /t REG_SZ /d "0" /f
+    
+    Write-Host "[OK] Performance optimization completed" -ForegroundColor Green
 }
 
-function Set-DarkTheme {
-    Write-Host "`n=== ТЕМНА ТЕМА ===" -ForegroundColor Magenta
+function Disable-OneDrive {
+    Write-Host "`n=== REMOVING ONEDRIVE ===" -ForegroundColor Magenta
     
-    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v "AppsUseLightTheme" /t REG_DWORD /d 0 /f
-    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v "SystemUsesLightTheme" /t REG_DWORD /d 0 /f
+    # Stop the process
+    Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
     
-    Write-Host "[OK] Темна тема увімкнена" -ForegroundColor Green
+    # Remove OneDrive
+    $onedrive32 = "$env:SYSTEMROOT\SysWOW64\OneDriveSetup.exe"
+    $onedrive64 = "$env:SYSTEMROOT\System32\OneDriveSetup.exe"
+    
+    if (Test-Path $onedrive32) {
+        Start-Process $onedrive32 -ArgumentList "/uninstall" -NoNewWindow -Wait
+        Write-Host "  OneDrive removed (32-bit)" -ForegroundColor Green
+    }
+    if (Test-Path $onedrive64) {
+        Start-Process $onedrive64 -ArgumentList "/uninstall" -NoNewWindow -Wait
+        Write-Host "  OneDrive removed (64-bit)" -ForegroundColor Green
+    }
+    
+    # Remove registry leftovers
+    reg delete "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /v "OneDriveSetup" /f -ErrorAction SilentlyContinue
+    reg delete "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /f -ErrorAction SilentlyContinue
+    
+    Write-Host "[OK] OneDrive removed" -ForegroundColor Green
 }
 
 function Show-Status {
-    Write-Host "`n=== ПОТОЧНИЙ СТАН ===" -ForegroundColor Cyan
+    Write-Host "`n=== CURRENT STATUS ===" -ForegroundColor Cyan
     
     $telemetry = (Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry" -ErrorAction SilentlyContinue).AllowTelemetry
-    Write-Host "Телеметрія: $($telemetry -eq 0 ? 'ВИМКНЕНО' : 'УВІМКНЕНО')" -ForegroundColor $(if($telemetry -eq 0){'Green'}else{'Red'})
+    if ($telemetry -eq 0) {
+        Write-Host "Telemetry: DISABLED" -ForegroundColor Green
+    } else {
+        Write-Host "Telemetry: ENABLED (risk)" -ForegroundColor Red
+    }
     
     $cortana = (Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search" -Name "AllowCortana" -ErrorAction SilentlyContinue).AllowCortana
-    Write-Host "Cortana: $($cortana -eq 0 ? 'ВИМКНЕНО' : 'УВІМКНЕНО')" -ForegroundColor $(if($cortana -eq 0){'Green'}else{'Red'})
+    if ($cortana -eq 0) {
+        Write-Host "Cortana: DISABLED" -ForegroundColor Green
+    } else {
+        Write-Host "Cortana: ENABLED" -ForegroundColor Yellow
+    }
+    
+    $doMode = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config" -Name "DODownloadMode" -ErrorAction SilentlyContinue).DODownloadMode
+    if ($doMode -eq 0) {
+        Write-Host "Delivery Optimization (P2P): DISABLED" -ForegroundColor Green
+    } else {
+        Write-Host "Delivery Optimization (P2P): ENABLED" -ForegroundColor Yellow
+    }
 }
 
 function Show-Menu {
     Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════╗
-║           WINDOWS LAPTOP OPTIMIZER - МОДУЛЬНИЙ СКРИПТ            ║
+║           WINDOWS LAPTOP OPTIMIZER - MODULAR SCRIPT             ║
 ╚══════════════════════════════════════════════════════════════════╝
 
-ДОСТУПНІ ФУНКЦІЇ:
+AVAILABLE FUNCTIONS:
 
-  [1] Disable-Telemetry      - Вимкнути всю телеметрію та стеження ⭐
-  [2] Disable-PrivacyServices - Вимкнути служби стеження
-  [3] Disable-TrackingTasks  - Вимкнути заплановані завдання телеметрії
-  [4] Disable-OneDrive        - Видалити OneDrive
-  [5] Optimize-Performance    - Оптимізація продуктивності
-  [6] Disable-GameDVR         - Вимкнути GameDVR
-  [7] Disable-WebSearch       - Вимкнути веб-пошук у Пуску
-  [8] Set-DarkTheme           - Увімкнути темну тему
-  [9] Show-Status            - Показати поточний стан
-  [A] ВСІ ФУНКЦІЇ (повна оптимізація)
-  [Q] Вихід
+  [1] Disable-Telemetry       - Disable telemetry (tracking) ⭐
+  [2] Disable-PrivacyServices - Disable tracking services
+  [3] Disable-TrackingTasks   - Disable scheduled tracking tasks
+  [4] Remove-Bloatware        - Remove bloatware apps
+  [5] Optimize-Performance    - Performance optimization
+  [6] Disable-OneDrive        - Remove OneDrive
+  [7] Show-Status             - Show current status
+  [8] ALL FUNCTIONS           - Full optimization
+  [Q] Exit
 
 "@
 }
 
 # ============================================
-# ОСНОВНА ЛОГІКА
+# COMMAND LINE PARAMETERS HANDLING
 # ============================================
 
 param(
@@ -276,56 +270,54 @@ if ($Function) {
         "telemetry" { Disable-Telemetry }
         "privacy" { Disable-PrivacyServices }
         "tracking" { Disable-TrackingTasks }
-        "onedrive" { Disable-OneDrive }
+        "bloatware" { Remove-Bloatware }
         "performance" { Optimize-Performance }
-        "gamedvr" { Disable-GameDVR }
-        "websearch" { Disable-WebSearch }
-        "darktheme" { Set-DarkTheme }
+        "onedrive" { Disable-OneDrive }
         "status" { Show-Status }
         "all" {
             Disable-Telemetry
             Disable-PrivacyServices
             Disable-TrackingTasks
-            Disable-OneDrive
+            Remove-Bloatware
             Optimize-Performance
-            Disable-GameDVR
-            Disable-WebSearch
+            Disable-OneDrive
         }
-        default { Write-Host "Невідома функція. Використовуйте: telemetry, privacy, tracking, onedrive, performance, gamedvr, websearch, darktheme, status, all" -ForegroundColor Red }
+        default { Write-Host "Unknown function. Options: telemetry, privacy, tracking, bloatware, performance, onedrive, status, all" -ForegroundColor Red }
     }
     exit 0
 }
 
-# Інтерактивний режим
+# ============================================
+# INTERACTIVE MODE
+# ============================================
+
 do {
     Show-Menu
-    $choice = Read-Host "Виберіть функцію"
+    $choice = Read-Host "Select function"
     
     switch ($choice) {
         "1" { Disable-Telemetry }
         "2" { Disable-PrivacyServices }
         "3" { Disable-TrackingTasks }
-        "4" { Disable-OneDrive }
+        "4" { Remove-Bloatware }
         "5" { Optimize-Performance }
-        "6" { Disable-GameDVR }
-        "7" { Disable-WebSearch }
-        "8" { Set-DarkTheme }
-        "9" { Show-Status }
-        "a" { 
+        "6" { Disable-OneDrive }
+        "7" { Show-Status }
+        "8" {
             Disable-Telemetry
             Disable-PrivacyServices
             Disable-TrackingTasks
-            Disable-OneDrive
+            Remove-Bloatware
             Optimize-Performance
-            Disable-GameDVR
-            Disable-WebSearch
+            Disable-OneDrive
+            Write-Host "`nFull optimization completed!" -ForegroundColor Green
         }
-        "q" { Write-Host "Вихід..." -ForegroundColor Yellow }
-        default { Write-Host "Невірний вибір" -ForegroundColor Red }
+        "q" { Write-Host "Exiting..." -ForegroundColor Yellow }
+        default { Write-Host "Invalid choice" -ForegroundColor Red }
     }
     
-    if ($choice -ne "q") {
-        Write-Host "`nНатисніть Enter для продовження..."
+    if (($choice -ne "q") -and ($choice -ne "8")) {
+        Write-Host "`nPress Enter to continue..."
         Read-Host
     }
     
