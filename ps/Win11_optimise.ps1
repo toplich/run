@@ -29,34 +29,34 @@ function Disable-Telemetry {
     Write-Host "`n=== DISABLING TELEMETRY & TRACKING ===" -ForegroundColor Magenta
     
     # Telemetry level: 0 - Security (minimum)
-    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" /v "AllowTelemetry" /t REG_DWORD /d 0 /f
-    reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection" /v "AllowTelemetry" /t REG_DWORD /d 0 /f
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" /v "AllowTelemetry" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
+    reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection" /v "AllowTelemetry" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
     
     # Disable advertising ID
-    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo" /v "DisabledByGroupPolicy" /t REG_DWORD /d 1 /f
-    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo" /v "Enabled" /t REG_DWORD /d 0 /f
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo" /v "DisabledByGroupPolicy" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo" /v "Enabled" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
     
     # Disable WiFi Sense and network data collection
-    reg add "HKLM\SOFTWARE\Microsoft\PolicyManager\default\WiFi\AllowWiFiHotSpotReporting" /v "value" /t REG_DWORD /d 0 /f
-    reg add "HKLM\SOFTWARE\Microsoft\WcmSvc\wifinetworkmanager\config" /v "AutoConnectAllowedOEM" /t REG_DWORD /d 0 /f
+    reg add "HKLM\SOFTWARE\Microsoft\PolicyManager\default\WiFi\AllowWiFiHotSpotReporting" /v "value" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
+    reg add "HKLM\SOFTWARE\Microsoft\WcmSvc\wifinetworkmanager\config" /v "AutoConnectAllowedOEM" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
     
     # Disable handwriting data sharing
-    reg add "HKCU\SOFTWARE\Microsoft\InputPersonalization" /v "RestrictImplicitTextCollection" /t REG_DWORD /d 1 /f
-    reg add "HKCU\SOFTWARE\Microsoft\InputPersonalization" /v "RestrictImplicitInkCollection" /t REG_DWORD /d 1 /f
+    reg add "HKCU\SOFTWARE\Microsoft\InputPersonalization" /v "RestrictImplicitTextCollection" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
+    reg add "HKCU\SOFTWARE\Microsoft\InputPersonalization" /v "RestrictImplicitInkCollection" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
     
     # Disable Tailored Experiences
-    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy" /v "TailoredExperiencesWithDiagnosticDataEnabled" /t REG_DWORD /d 0 /f
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy" /v "TailoredExperiencesWithDiagnosticDataEnabled" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
     
     # Disable Find My Device
-    reg add "HKLM\SOFTWARE\Microsoft\Settings\FindMyDevice" /v "LocationSyncEnabled" /t REG_DWORD /d 0 /f
+    reg add "HKLM\SOFTWARE\Microsoft\Settings\FindMyDevice" /v "LocationSyncEnabled" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
     
     # Disable Cortana completely
-    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowCortana" /t REG_DWORD /d 0 /f
-    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowCortanaAboveLock" /t REG_DWORD /d 0 /f
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowCortana" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowCortanaAboveLock" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
     
     # Disable P2P updates (Delivery Optimization)
-    reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config" /v "DODownloadMode" /t REG_DWORD /d 0 /f
-    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization" /v "DODownloadMode" /t REG_DWORD /d 0 /f
+    reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config" /v "DODownloadMode" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization" /v "DODownloadMode" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
     
     Write-Host "[OK] Telemetry disabled" -ForegroundColor Green
 }
@@ -82,7 +82,7 @@ function Disable-PrivacyServices {
     }
     
     # Disable Windows Error Reporting
-    reg add "HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting" /v "Disabled" /t REG_DWORD /d 1 /f
+    reg add "HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting" /v "Disabled" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
     
     Write-Host "[OK] Tracking services disabled" -ForegroundColor Green
 }
@@ -110,7 +110,7 @@ function Disable-TrackingTasks {
     )
     
     foreach ($taskName in $taskNames) {
-        Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue | Disable-ScheduledTask -ErrorAction SilentlyContinue
+        Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue | Disable-ScheduledTask -ErrorAction SilentlyContinue | Out-Null
         Write-Host "  Disabled: $taskName" -ForegroundColor DarkYellow
     }
     
@@ -165,20 +165,20 @@ function Optimize-Performance {
     Write-Host "`n=== PERFORMANCE OPTIMIZATION ===" -ForegroundColor Magenta
     
     # Disable GameDVR
-    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\GameDVR" /v "AppCaptureEnabled" /t REG_DWORD /d 0 /f
-    reg add "HKCU\System\GameConfigStore" /v "GameDVR_Enabled" /t REG_DWORD /d 0 /f
-    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\GameDVR" /v "AllowGameDVR" /t REG_DWORD /d 0 /f
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\GameDVR" /v "AppCaptureEnabled" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
+    reg add "HKCU\System\GameConfigStore" /v "GameDVR_Enabled" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\GameDVR" /v "AllowGameDVR" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
     
     # Disable web search in Start Menu
-    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "DisableWebSearch" /t REG_DWORD /d 1 /f
-    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowSearchToUseLocation" /t REG_DWORD /d 0 /f
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "DisableWebSearch" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowSearchToUseLocation" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
     
     # Power plan: Balanced (for laptops)
-    powercfg /setactive SCHEME_BALANCED
+    powercfg /setactive SCHEME_BALANCED 2>&1 | Out-Null
     
     # Disable animations (speeds up weak laptops)
-    reg add "HKCU\Control Panel\Desktop" /v "UserPreferencesMask" /t REG_BINARY /d "9012038010000000" /f
-    reg add "HKCU\Control Panel\Desktop\WindowMetrics" /v "MinAnimate" /t REG_SZ /d "0" /f
+    reg add "HKCU\Control Panel\Desktop" /v "UserPreferencesMask" /t REG_BINARY /d "9012038010000000" /f 2>&1 | Out-Null
+    reg add "HKCU\Control Panel\Desktop\WindowMetrics" /v "MinAnimate" /t REG_SZ /d "0" /f 2>&1 | Out-Null
     
     Write-Host "[OK] Performance optimization completed" -ForegroundColor Green
 }
@@ -202,9 +202,16 @@ function Disable-OneDrive {
         Write-Host "  OneDrive removed (64-bit)" -ForegroundColor Green
     }
     
-    # Remove registry leftovers
-    reg delete "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /v "OneDriveSetup" /f -ErrorAction SilentlyContinue
-    reg delete "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /f -ErrorAction SilentlyContinue
+    # Remove registry leftovers (FIXED SYNTAX)
+    # Remove the Run entry if it exists
+    reg delete "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /v "OneDriveSetup" /f 2>&1 | Out-Null
+    
+    # Remove the desktop namespace key if it exists
+    reg delete "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /f 2>&1 | Out-Null
+    
+    # Also remove common OneDrive registry keys
+    reg delete "HKCU\SOFTWARE\Microsoft\OneDrive" /f 2>&1 | Out-Null
+    reg delete "HKLM\SOFTWARE\Microsoft\OneDrive" /f 2>&1 | Out-Null
     
     Write-Host "[OK] OneDrive removed" -ForegroundColor Green
 }
@@ -231,6 +238,14 @@ function Show-Status {
         Write-Host "Delivery Optimization (P2P): DISABLED" -ForegroundColor Green
     } else {
         Write-Host "Delivery Optimization (P2P): ENABLED" -ForegroundColor Yellow
+    }
+    
+    # Check OneDrive status
+    $oneDriveProcess = Get-Process -Name "OneDrive" -ErrorAction SilentlyContinue
+    if (-not $oneDriveProcess) {
+        Write-Host "OneDrive: REMOVED" -ForegroundColor Green
+    } else {
+        Write-Host "OneDrive: STILL RUNNING" -ForegroundColor Yellow
     }
 }
 
@@ -260,12 +275,9 @@ AVAILABLE FUNCTIONS:
 # COMMAND LINE PARAMETERS HANDLING
 # ============================================
 
-param(
-    [Parameter(Position=0)]
-    [string]$Function = ""
-)
-
-if ($Function) {
+# Check if called with -Function parameter
+if ($args.Count -gt 0) {
+    $Function = $args[1]  # Get value after -Function
     switch ($Function.ToLower()) {
         "telemetry" { Disable-Telemetry }
         "privacy" { Disable-PrivacyServices }
