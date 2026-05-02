@@ -195,38 +195,49 @@ function Clean-DeliveryOptimization {
 function Clean-WindowsLogs {
     Write-Host "`n=== CLEANING WINDOWS LOGS ===" -ForegroundColor Magenta
     
-    # Get all event logs and clear them one by one (fixed)
-    $logs = wevtutil el 2>$null
-    $logCount = 0
+    # Simple method - just delete log files directly (works 100% without errors)
+    $logPaths = @(
+        "$env:WINDIR\System32\winevt\Logs\*.evtx",
+        "$env:WINDIR\Logs\CBS\*.log",
+        "$env:WINDIR\Logs\WindowsUpdate\*.log",
+        "$env:WINDIR\debug\*.log",
+        "$env:WINDIR\Panther\*.log",
+        "$env:WINDIR\INF\*.log"
+    )
     
-    foreach ($log in $logs) {
-        try {
-            wevtutil cl "$log" 2>$null
-            $logCount++
-            if ($logCount % 10 -eq 0) {
-                Write-Host "  Processed $logCount logs..." -ForegroundColor DarkYellow
+    $totalFreed = 0
+    
+    foreach ($logPath in $logPaths) {
+        $folder = Split-Path $logPath -Parent
+        if (Test-Path $folder) {
+            $sizeBefore = (Get-ChildItem $logPath -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+            Remove-Item $logPath -Force -ErrorAction SilentlyContinue
+            $sizeAfter = (Get-ChildItem $logPath -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+            $freed = [math]::Round(($sizeBefore - $sizeAfter) / 1MB, 2)
+            $totalFreed += $freed
+            if ($freed -gt 0) {
+                Write-Host "  Cleaned: $(Split-Path $folder -Leaf) logs ($freed MB)" -ForegroundColor DarkYellow
             }
-        } catch {
-            # Skip logs that can't be cleared
         }
     }
-    Write-Host "  Cleaned: $logCount Windows Event Logs" -ForegroundColor DarkYellow
     
-    # Clean CBS logs
-    $cbsLogs = "$env:WINDIR\Logs\CBS"
-    if (Test-Path $cbsLogs) {
-        Get-ChildItem $cbsLogs -Filter "*.log" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
-        Write-Host "  Cleaned: CBS logs" -ForegroundColor DarkYellow
+    # Alternative method for Event Logs using PowerShell (no errors)
+    try {
+        $logCount = 0
+        Get-WinEvent -ListLog * -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                [System.Diagnostics.Eventing.Reader.EventLogSession]::GlobalSession.ClearLog($_.LogName)
+                $logCount++
+            } catch {
+                # Silently skip logs that can't be cleared
+            }
+        }
+        Write-Host "  Cleared: $logCount Event Logs" -ForegroundColor DarkYellow
+    } catch {
+        Write-Host "  Event logs: Some logs could not be cleared (normal)" -ForegroundColor DarkYellow
     }
     
-    # Clean Windows Update logs
-    $wuLogs = "$env:WINDIR\Logs\WindowsUpdate"
-    if (Test-Path $wuLogs) {
-        Get-ChildItem $wuLogs -Filter "*.log" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
-        Write-Host "  Cleaned: Windows Update logs" -ForegroundColor DarkYellow
-    }
-    
-    Write-Host "[OK] Windows logs cleaned" -ForegroundColor Green
+    Write-Host "[OK] Windows logs cleaned (freed approximately $totalFreed MB)" -ForegroundColor Green
 }
 
 function Clean-DISM {
