@@ -61,8 +61,7 @@ function Clean-TemporaryFiles {
     $tempPaths = @(
         "$env:TEMP",
         "$env:WINDIR\Temp",
-        "C:\Windows\Temp",
-        "$env:LOCALAPPDATA\Temp"
+        "C:\Windows\Temp"
     )
     
     $totalFreed = 0
@@ -91,7 +90,10 @@ function Clean-Prefetch {
     $prefetchPath = "$env:WINDIR\Prefetch"
     if (Test-Path $prefetchPath) {
         $sizeBefore = (Get-ChildItem $prefetchPath -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
-        Get-ChildItem $prefetchPath -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+        
+        # Skip the ReadyBoot folder to avoid confirmation prompt
+        Get-ChildItem $prefetchPath -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne "ReadyBoot" } | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+        
         $sizeAfter = (Get-ChildItem $prefetchPath -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
         $freed = [math]::Round(($sizeBefore - $sizeAfter) / 1MB, 2)
         Write-Host "  Cleaned: Prefetch ($freed MB)" -ForegroundColor DarkYellow
@@ -136,33 +138,38 @@ function Clean-DownloadsFolder {
 function Clean-BrowserCache {
     Write-Host "`n=== CLEANING BROWSER CACHE ===" -ForegroundColor Magenta
     
-    $browsers = @{
-        "Chrome" = "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Cache"
-        "Edge"   = "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Cache"
-        "Firefox" = "$env:APPDATA\Mozilla\Firefox\Profiles"
-    }
-    
     $totalFreed = 0
     
-    foreach ($browser in $browsers.Keys) {
-        $path = $browsers[$browser]
-        if (Test-Path $path) {
-            if ($browser -eq "Firefox") {
-                $profiles = Get-ChildItem "$env:APPDATA\Mozilla\Firefox\Profiles\*.default-release\cache" -ErrorAction SilentlyContinue
-                foreach ($profile in $profiles) {
-                    $sizeBefore = (Get-ChildItem $profile -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
-                    Remove-Item "$profile\*" -Force -Recurse -ErrorAction SilentlyContinue
-                    $freed = [math]::Round($sizeBefore / 1MB, 2)
-                    $totalFreed += $freed
-                    Write-Host "  Cleaned: Firefox cache ($freed MB)" -ForegroundColor DarkYellow
-                }
-            } else {
-                $sizeBefore = (Get-ChildItem $path -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
-                Remove-Item "$path\*" -Force -Recurse -ErrorAction SilentlyContinue
-                $freed = [math]::Round($sizeBefore / 1MB, 2)
-                $totalFreed += $freed
-                Write-Host "  Cleaned: $browser cache ($freed MB)" -ForegroundColor DarkYellow
-            }
+    # Chrome
+    $chromeCache = "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Cache"
+    if (Test-Path $chromeCache) {
+        $sizeBefore = (Get-ChildItem $chromeCache -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+        Remove-Item "$chromeCache\*" -Force -Recurse -ErrorAction SilentlyContinue
+        $freed = [math]::Round($sizeBefore / 1MB, 2)
+        $totalFreed += $freed
+        Write-Host "  Cleaned: Chrome cache ($freed MB)" -ForegroundColor DarkYellow
+    }
+    
+    # Edge
+    $edgeCache = "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Cache"
+    if (Test-Path $edgeCache) {
+        $sizeBefore = (Get-ChildItem $edgeCache -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+        Remove-Item "$edgeCache\*" -Force -Recurse -ErrorAction SilentlyContinue
+        $freed = [math]::Round($sizeBefore / 1MB, 2)
+        $totalFreed += $freed
+        Write-Host "  Cleaned: Edge cache ($freed MB)" -ForegroundColor DarkYellow
+    }
+    
+    # Firefox
+    $firefoxProfiles = "$env:APPDATA\Mozilla\Firefox\Profiles"
+    if (Test-Path $firefoxProfiles) {
+        $firefoxCaches = Get-ChildItem "$firefoxProfiles\*\cache" -ErrorAction SilentlyContinue
+        foreach ($cache in $firefoxCaches) {
+            $sizeBefore = (Get-ChildItem $cache -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+            Remove-Item "$cache\*" -Force -Recurse -ErrorAction SilentlyContinue
+            $freed = [math]::Round($sizeBefore / 1MB, 2)
+            $totalFreed += $freed
+            Write-Host "  Cleaned: Firefox cache ($freed MB)" -ForegroundColor DarkYellow
         }
     }
     
@@ -188,17 +195,35 @@ function Clean-DeliveryOptimization {
 function Clean-WindowsLogs {
     Write-Host "`n=== CLEANING WINDOWS LOGS ===" -ForegroundColor Magenta
     
-    wevtutil el | ForEach-Object {
-        try {
-            wevtutil cl $_ -ErrorAction SilentlyContinue
-        } catch {}
-    }
-    Write-Host "  Cleaned: Windows Event Logs" -ForegroundColor DarkYellow
+    # Get all event logs and clear them one by one (fixed)
+    $logs = wevtutil el 2>$null
+    $logCount = 0
     
+    foreach ($log in $logs) {
+        try {
+            wevtutil cl "$log" 2>$null
+            $logCount++
+            if ($logCount % 10 -eq 0) {
+                Write-Host "  Processed $logCount logs..." -ForegroundColor DarkYellow
+            }
+        } catch {
+            # Skip logs that can't be cleared
+        }
+    }
+    Write-Host "  Cleaned: $logCount Windows Event Logs" -ForegroundColor DarkYellow
+    
+    # Clean CBS logs
     $cbsLogs = "$env:WINDIR\Logs\CBS"
     if (Test-Path $cbsLogs) {
         Get-ChildItem $cbsLogs -Filter "*.log" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
         Write-Host "  Cleaned: CBS logs" -ForegroundColor DarkYellow
+    }
+    
+    # Clean Windows Update logs
+    $wuLogs = "$env:WINDIR\Logs\WindowsUpdate"
+    if (Test-Path $wuLogs) {
+        Get-ChildItem $wuLogs -Filter "*.log" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+        Write-Host "  Cleaned: Windows Update logs" -ForegroundColor DarkYellow
     }
     
     Write-Host "[OK] Windows logs cleaned" -ForegroundColor Green
@@ -209,7 +234,12 @@ function Clean-DISM {
     
     Write-Host "  This may take a few minutes..." -ForegroundColor DarkYellow
     
-    dism /online /Cleanup-Image /StartComponentCleanup /ResetBase /quiet 2>&1 | Out-Null
+    # Run DISM cleanup (removes old Windows components)
+    $result = dism /online /Cleanup-Image /StartComponentCleanup /ResetBase /quiet 2>&1
+    
+    # Also run Disk Cleanup for additional system files
+    Write-Host "  Running system file cleanup..." -ForegroundColor DarkYellow
+    cleanmgr /sagerun:1 2>&1 | Out-Null
     
     Write-Host "[OK] DISM cleanup completed" -ForegroundColor Green
 }
@@ -254,8 +284,15 @@ function Clean-DuplicateFiles {
     }
     
     $duplicateSizeGB = [math]::Round($duplicateSize / 1GB, 2)
-    Write-Host "  Found approximately $duplicateCount duplicate file groups" -ForegroundColor DarkYellow
-    Write-Host "  Potential space waste: $duplicateSizeGB GB" -ForegroundColor DarkYellow
+    $duplicateSizeMB = [math]::Round($duplicateSize / 1MB, 2)
+    
+    if ($duplicateSizeGB -ge 1) {
+        Write-Host "  Found approximately $duplicateCount duplicate file groups" -ForegroundColor DarkYellow
+        Write-Host "  Potential space waste: $duplicateSizeGB GB" -ForegroundColor DarkYellow
+    } else {
+        Write-Host "  Found approximately $duplicateCount duplicate file groups" -ForegroundColor DarkYellow
+        Write-Host "  Potential space waste: $duplicateSizeMB MB" -ForegroundColor DarkYellow
+    }
     Write-Host "  (Automatic removal not enabled - use manual cleanup tool)" -ForegroundColor Yellow
 }
 
