@@ -89,14 +89,21 @@ function Clean-Prefetch {
     
     $prefetchPath = "$env:WINDIR\Prefetch"
     if (Test-Path $prefetchPath) {
-        $sizeBefore = (Get-ChildItem $prefetchPath -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+        # Отримуємо всі файли (виключаємо папки)
+        $files = Get-ChildItem $prefetchPath -File -ErrorAction SilentlyContinue | Where-Object { 
+            $_.Name -notlike "Layout.ini" -and $_.Name -notlike "ReadyBoot*" 
+        }
         
-        # Skip the ReadyBoot folder to avoid confirmation prompt
-        Get-ChildItem $prefetchPath -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne "ReadyBoot" } | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
-        
-        $sizeAfter = (Get-ChildItem $prefetchPath -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
-        $freed = [math]::Round(($sizeBefore - $sizeAfter) / 1MB, 2)
-        Write-Host "  Cleaned: Prefetch ($freed MB)" -ForegroundColor DarkYellow
+        if ($files.Count -gt 0) {
+            $totalSize = ($files | Measure-Object -Property Length -Sum).Sum
+            $totalSizeMB = [math]::Round($totalSize / 1MB, 2)
+            
+            $files | Remove-Item -Force -ErrorAction SilentlyContinue
+            
+            Write-Host "  Cleaned: Prefetch ($totalSizeMB MB)" -ForegroundColor DarkYellow
+        } else {
+            Write-Host "  Prefetch: nothing to clean" -ForegroundColor DarkYellow
+        }
         Write-Host "[OK] Prefetch files cleaned" -ForegroundColor Green
     } else {
         Write-Host "[SKIP] Prefetch folder not found" -ForegroundColor Yellow
