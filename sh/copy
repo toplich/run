@@ -1,0 +1,87 @@
+Важливий нюанс щодо фільтра: якщо фільтрувати строго за 22D2025-11, файл метаданих Yetiweb_hzcc_79CE1.vbm не потрапить у копію (у його імені немає дати) — а без .vbm Veeam не зможе розпізнати ланцюжок при Import Backup. Тому я додав окреме правило, яке завжди включає всі .vbm-файли незалежно від дати (вони маленькі, це не вплине на обсяг).
+
+1. Скрипт (виконати на veeam-repo — сервері-джерелі):
+
+bash
+cat << 'EOF' > /root/sync-nov-yetiweb.sh
+#!/bin/bash
+set -u
+
+SRC="/mnt/veeam/STEP k44 Backup/STEP CCHZ"
+DEST_HOST="root@138.201.252.215"
+DEST_PATH="/mnt/backup-disk/veeam"
+LOGFILE="/var/log/sync-nov-yetiweb.log"
+
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOGFILE"
+}
+
+log "=== Старт синхронізації: 22D2025-11 (Yetiweb_hzcc, листопад) ==="
+
+while true; do
+  log "Спроба з'єднання і копіювання..."
+
+  rsync -avh --partial --progress --append-verify \
+    --include='*/' \
+    --include='*22D2025-11*' \
+    --include='*.vbm' \
+    --exclude='*' \
+    -e "ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10" \
+    "$SRC/" "$DEST_HOST:$DEST_PATH/" 2>&1 | tee -a "$LOGFILE"
+
+  RC=${PIPESTATUS[0]}
+
+  if [ "$RC" -eq 0 ]; then
+    log "Копіювання завершено успішно."
+    break
+  else
+    log "Помилка/розрив з'єднання (код $RC). Повтор через 30 секунд."
+    sleep 30
+  fi
+done
+
+log "=== Задача завершена ==="
+EOF
+chmod +x /root/sync-nov-yetiweb.sh
+
+2. Переконайтесь, що на Hetzner-сервері (138.201.252.215) вже існує папка призначення:
+
+bash
+ssh root@138.201.252.215 "mkdir -p /mnt/backup-disk/veeam"
+
+3. Systemd-сервіс (теж на veeam-repo):
+
+bash
+cat << 'EOF' > /etc/systemd/system/sync-nov-yetiweb.service
+[Unit]
+Description=Sync November 2025 (22D) Yetiweb_hzcc backups to Hetzner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/root/sync-nov-yetiweb.sh
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable sync-nov-yetiweb.service
+systemctl start sync-nov-yetiweb.service
+
+4. Перевірка перед запуском (рекомендую) — подивіться, які саме файли підхопить фільтр, не копіюючи їх:
+
+bash
+rsync -avhn --include='*/' --include='*22D2025-11*' --include='*.vbm' --exclude='*' "/mnt/veeam/STEP k44 Backup/STEP CCHZ/" /tmp/dry-run-check/
+
+Прапорець -n — dry-run, нічого не копіює, лише показує список файлів, які потрапили б під фільтр. Перевірте, що там саме листопадові .vbk для Yetiweb_hzcc і потрібний .vbm.
+
+5. Моніторинг:
+
+bash
+tail -f /var/log/sync-nov-yetiweb.log
+
+Підтвердіть, будь ласка, шлях джерела (SRC) — якщо він відрізняється від того, що я взяв зі скріншота, скажіть правильний, і я поправлю.
