@@ -87,34 +87,49 @@ tail -f /var/log/sync-nov-yetiweb.log
 Підтвердіть, будь ласка, шлях джерела (SRC) — якщо він відрізняється від того, що я взяв зі скріншота, скажіть правильний, і я поправлю.
 
 
-cat << 'EOF' > /root/sync-last2-backups.sh
+e '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOGFILE"
+}
+
+
+........................
+
+Скрипт з періодом дат
+bash
+cat << 'EOF' > /root/vsync.sh
 #!/bin/bash
 set -u
 
 SRC="/mnt/veeam/STEP k44 Backup"
 DEST_HOST="root@138.201.252.215"
 DEST_PATH="/mnt/backup-disk/veeam"
-LOGFILE="/var/log/sync-last2-backups.log"
+LOGFILE="/var/log/vsync.log"
+FILELIST="/tmp/vsync-filelist.txt"
 
-# Вкажіть тут дві ОСТАННІ ПОСЛІДОВНІ дати (формат як у назвах файлів: YYYY-MM-DD)
-DATE1="2025-11-07"
-DATE2="2025-11-08"
+# Період копіювання (включно з обома датами)
+DATE_FROM="2025-11-07"
+DATE_TO="2025-11-08"
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOGFILE"
 }
 
-log "=== Старт синхронізації: останні 2 точки ($DATE1, $DATE2) по всіх ВМ ==="
+# Верхня межа - "наступний день після DATE_TO", щоб включити весь DATE_TO цілком
+DATE_TO_EXCL=$(date -d "$DATE_TO +1 day" +%Y-%m-%d)
+
+log "=== Старт синхронізації: період $DATE_FROM - $DATE_TO ==="
+
+# Формуємо список файлів: усе в межах періоду + всі .vbm (метадані) окремо
+find "$SRC" -type f -newermt "$DATE_FROM 00:00:00" ! -newermt "$DATE_TO_EXCL 00:00:00" -printf '%P\n' > "$FILELIST"
+find "$SRC" -type f -iname '*.vbm' -printf '%P\n' >> "$FILELIST"
+sort -u "$FILELIST" -o "$FILELIST"
+
+log "Знайдено файлів для копіювання: $(wc -l < "$FILELIST")"
 
 while true; do
   log "Спроба з'єднання і копіювання..."
 
   rsync -avh --partial --progress --append-verify \
-    --include='*/' \
-    --include="*${DATE1}*" \
-    --include="*${DATE2}*" \
-    --include='*.vbm' \
-    --exclude='*' \
+    --files-from="$FILELIST" \
     -e "ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10" \
     "$SRC/" "$DEST_HOST:$DEST_PATH/" 2>&1 | tee -a "$LOGFILE"
 
@@ -128,6 +143,53 @@ while true; do
     sleep 30
   fi
 done
+
+log "=== Задача завершена ==="
+EOF
+chmod +x /root/vsync.sh
+Сервіс з короткою назвою
+bash
+cat << 'EOF' > /etc/systemd/system/vsync.service
+[Unit]
+Description=Veeam backup sync to Hetzner (date range)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/root/vsync.sh
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable vsync.service
+
+Тепер всі команди управління коротші:
+
+bash
+systemctl start vsync.service
+systemctl stop vsync.service
+systemctl status vsync.service
+systemctl restart vsync.service
+tail -f /var/log/vsync.log
+Перевірка перед запуском
+
+Раджу спочатку глянути, скільки і яких файлів попаде в діапазон (без реального копіювання):
+
+bash
+DATE_FROM="2025-11-07"
+DATE_TO_EXCL=$(date -d "2025-11-08 +1 day" +%Y-%m-%d)
+find "/mnt/veeam/STEP k44 Backup" -type f -newermt "$DATE_FROM 00:00:00" ! -newermt "$DATE_TO_EXCL 00:00:00"
+
+Далі, щоб змінити період наступного разу — просто редагуєте DATE_FROM/DATE_TO у /root/vsync.sh (nano /root/vsync.sh) і systemctl restart vsync.service.
+
+
+
+
 
 log "=== Задача завершена ==="
 EOF
