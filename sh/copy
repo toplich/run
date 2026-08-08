@@ -205,22 +205,7 @@ cd "/mnt/veeam/STEP k44 Backup"
 
 rsync -avhR --partial --progress --append-verify \
   -e "ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10" \
-  "./STEP BuhHZ/Win_hz_buh_FC44F.vbm" \
-  "./STEP BuhHZ/Win_hz_buh.8D2025-11-07T051343_9DCA.vbk" \
-  "./STEP BuhHZ/Win_hz_buh.8D2025-11-08T000012_ABC0.vib" \
-  "./STEP CCHZ/3CX_hzcc_82EC7.vbm" \
-  "./STEP CCHZ/3CX_hzcc.53D2025-11-07T000334_9AE2.vbk" \
-  "./STEP CCHZ/3CX_hzcc.53D2025-11-08T000354_028A.vbk" \
-  root@138.201.252.215:/mnt/backup-disk/veeam/
-
-
-
-
-cd "/mnt/veeam/STEP k44 Backup"
-
-rsync -avhR --partial --progress --append-verify \
-  -e "ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10" \
-  "./VT/Deb12_VT.97D2025-07-04T000007_0377.vbk" \
-  "./VT/Deb12_VT.97D2025-07-05T061543_1E2E.vbk" \
-  "./VT/Deb12_VT_D30B0.vbm" \
+  "./STEP CCHZ/VoipTime_hzcc.26D2025-11-07T035514_B31C.vbk" \
+  "./STEP CCHZ/VoipTime_hzcc.26D2025-11-08T042219_55B3.vbk" \
+  "./STEP CCHZ/VoipTime_hzcc_CFD9E.vbm" \
   root@138.201.252.215:/mnt/backup-disk/veeam/
