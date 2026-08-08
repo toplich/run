@@ -196,3 +196,19 @@ find "/mnt/veeam/STEP k44 Backup" -type f -newermt "$DATE_FROM 00:00:00" ! -newe
 log "=== Задача завершена ==="
 EOF
 chmod +x /root/sync-last2-backups.sh
+
+
+
+-----------------------
+
+cd "/mnt/veeam/STEP k44 Backup"
+
+rsync -avhR --partial --progress --append-verify \
+  -e "ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10" \
+  "./STEP BuhHZ/Win_hz_buh_FC44F.vbm" \
+  "./STEP BuhHZ/Win_hz_buh.8D2025-11-07T051343_9DCA.vbk" \
+  "./STEP BuhHZ/Win_hz_buh.8D2025-11-08T000012_ABC0.vib" \
+  "./STEP CCHZ/3CX_hzcc_82EC7.vbm" \
+  "./STEP CCHZ/3CX_hzcc.53D2025-11-07T000334_9AE2.vbk" \
+  "./STEP CCHZ/3CX_hzcc.53D2025-11-08T000354_028A.vbk" \
+  root@138.201.252.215:/mnt/backup-disk/veeam/
