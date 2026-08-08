@@ -147,7 +147,9 @@ done
 log "=== Задача завершена ==="
 EOF
 chmod +x /root/vsync.sh
+
 Сервіс з короткою назвою
+
 bash
 cat << 'EOF' > /etc/systemd/system/vsync.service
 [Unit]
