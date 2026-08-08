@@ -205,7 +205,7 @@ cd "/mnt/veeam/STEP k44 Backup"
 
 rsync -avhR --partial --progress --append-verify \
   -e "ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10" \
-  "./STEP CCHZ/VoipTime_hzcc.26D2025-11-07T035514_B31C.vbk" \
-  "./STEP CCHZ/VoipTime_hzcc.26D2025-11-08T042219_55B3.vbk" \
-  "./STEP CCHZ/VoipTime_hzcc_CFD9E.vbm" \
+  "./STEP CCHZ/Deb12_VT.97D2025-11-07T040917_5D5F.vbk" \
+  "./STEP CCHZ/Deb12_VT.97D2025-11-08T044100_4B09.vbk" \
+  "./STEP CCHZ/Deb12_VT_30BCB.vbm" \
   root@138.201.252.215:/mnt/backup-disk/veeam/
