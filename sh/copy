@@ -85,3 +85,50 @@ bash
 tail -f /var/log/sync-nov-yetiweb.log
 
 Підтвердіть, будь ласка, шлях джерела (SRC) — якщо він відрізняється від того, що я взяв зі скріншота, скажіть правильний, і я поправлю.
+
+
+cat << 'EOF' > /root/sync-last2-backups.sh
+#!/bin/bash
+set -u
+
+SRC="/mnt/veeam/STEP k44 Backup"
+DEST_HOST="root@138.201.252.215"
+DEST_PATH="/mnt/backup-disk/veeam"
+LOGFILE="/var/log/sync-last2-backups.log"
+
+# Вкажіть тут дві ОСТАННІ ПОСЛІДОВНІ дати (формат як у назвах файлів: YYYY-MM-DD)
+DATE1="2025-11-07"
+DATE2="2025-11-08"
+
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOGFILE"
+}
+
+log "=== Старт синхронізації: останні 2 точки ($DATE1, $DATE2) по всіх ВМ ==="
+
+while true; do
+  log "Спроба з'єднання і копіювання..."
+
+  rsync -avh --partial --progress --append-verify \
+    --include='*/' \
+    --include="*${DATE1}*" \
+    --include="*${DATE2}*" \
+    --include='*.vbm' \
+    --exclude='*' \
+    -e "ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10" \
+    "$SRC/" "$DEST_HOST:$DEST_PATH/" 2>&1 | tee -a "$LOGFILE"
+
+  RC=${PIPESTATUS[0]}
+
+  if [ "$RC" -eq 0 ]; then
+    log "Копіювання завершено успішно."
+    break
+  else
+    log "Помилка/розрив з'єднання (код $RC). Повтор через 30 секунд."
+    sleep 30
+  fi
+done
+
+log "=== Задача завершена ==="
+EOF
+chmod +x /root/sync-last2-backups.sh
