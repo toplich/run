@@ -205,6 +205,12 @@ cd "/mnt/veeam/STEP k44 Backup"
 
 rsync -avhR --partial --progress --append-verify \
   -e "ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10" \
+  "./STEP BuhHZ/Win_hz_buh.8D2025-11-01T102244_E5CB.vbk" \
+  "./STEP BuhHZ/Win_hz_buh.8D2025-11-02T043332_FF06.vbk" \
+  "./STEP BuhHZ/Win_hz_buh.8D2025-11-03T124737_697D.vbk" \
+  "./STEP BuhHZ/Win_hz_buh.8D2025-11-04T060358_18C9.vbk" \
+  "./STEP BuhHZ/Win_hz_buh.8D2025-11-05T000019_88B3.vib" \
+  "./STEP BuhHZ/Win_hz_buh.8D2025-11-06T025520_735B.vbk" \
   "./STEP BuhHZ/Win_hz_buh.8D2025-11-07T051343_9DCA.vbk" \
   "./STEP BuhHZ/Win_hz_buh.8D2025-11-08T000012_ABC0.vib" \
   "./STEP BuhHZ/Win_hz_buh_FC44F.vbm" \
