@@ -62,7 +62,7 @@ git sparse-checkout set docker/minio
 ▶️ **Run a script**
 ```powershell
 # Add to $PROFILE
-function rs { irm "https://run.topli.ch/ps/$args" | iex }
+function rs { irm "https://run.topli.ch/$args" | iex }
 # Then run any script
 rs Win11_DiskCleanup.ps1
 ```
