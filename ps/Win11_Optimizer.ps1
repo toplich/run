@@ -1,8 +1,10 @@
 <#
 .SYNOPSIS
-    Windows Laptop Optimizer (for Windows PowerShell 5.1)
+    Windows Laptop / Admin-VM Optimizer (for Windows PowerShell 5.1)
 .DESCRIPTION
-    Modular script for Windows optimization and privacy protection
+    Modular script for Windows optimization and privacy protection.
+    Extended with an Optimize-AdminOnlyVM module for VMs used purely
+    as an admin jump-box (browser + RDP/console access, nothing else).
 #>
 
 # ============================================
@@ -27,69 +29,53 @@ Write-Host "Running as Administrator - OK" -ForegroundColor Green
 
 function Disable-Telemetry {
     Write-Host "`n=== DISABLING TELEMETRY & TRACKING ===" -ForegroundColor Magenta
-    
-    # Telemetry level: 0 - Security (minimum)
+
     reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" /v "AllowTelemetry" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
     reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection" /v "AllowTelemetry" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
-    
-    # Disable advertising ID
     reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo" /v "DisabledByGroupPolicy" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
     reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo" /v "Enabled" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
-    
-    # Disable WiFi Sense and network data collection
     reg add "HKLM\SOFTWARE\Microsoft\PolicyManager\default\WiFi\AllowWiFiHotSpotReporting" /v "value" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
     reg add "HKLM\SOFTWARE\Microsoft\WcmSvc\wifinetworkmanager\config" /v "AutoConnectAllowedOEM" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
-    
-    # Disable handwriting data sharing
     reg add "HKCU\SOFTWARE\Microsoft\InputPersonalization" /v "RestrictImplicitTextCollection" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
     reg add "HKCU\SOFTWARE\Microsoft\InputPersonalization" /v "RestrictImplicitInkCollection" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
-    
-    # Disable Tailored Experiences
     reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy" /v "TailoredExperiencesWithDiagnosticDataEnabled" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
-    
-    # Disable Find My Device
     reg add "HKLM\SOFTWARE\Microsoft\Settings\FindMyDevice" /v "LocationSyncEnabled" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
-    
-    # Disable Cortana completely
     reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowCortana" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
     reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowCortanaAboveLock" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
-    
-    # Disable P2P updates (Delivery Optimization)
     reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config" /v "DODownloadMode" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
     reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization" /v "DODownloadMode" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
-    
+
     Write-Host "[OK] Telemetry disabled" -ForegroundColor Green
 }
 
 function Disable-PrivacyServices {
     Write-Host "`n=== DISABLING TRACKING SERVICES ===" -ForegroundColor Magenta
-    
+
     $services = @(
-        "DiagTrack",           # Connected User Experiences and Telemetry
-        "dmwappushservice",    # Device Management WAP Push
-        "WMPNetworkSvc",       # Windows Media Player Network Sharing
-        "RemoteRegistry",      # Remote Registry access
-        "lfsvc",               # Geolocation Service
-        "MapsBroker",          # Downloaded Maps Manager
-        "PcaSvc",              # Program Compatibility Assistant
-        "SysMain"              # Superfetch (saves resources)
+        "DiagTrack",
+        "dmwappushservice",
+        "WMPNetworkSvc",
+        "RemoteRegistry",
+        "lfsvc",
+        "MapsBroker",
+        "PcaSvc",
+        "SysMain"
     )
-    
+
     foreach ($svc in $services) {
         Stop-Service $svc -ErrorAction SilentlyContinue
         Set-Service $svc -StartupType Disabled -ErrorAction SilentlyContinue
         Write-Host "  Disabled: $svc" -ForegroundColor DarkYellow
     }
-    
-    # Disable Windows Error Reporting
+
     reg add "HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting" /v "Disabled" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
-    
+
     Write-Host "[OK] Tracking services disabled" -ForegroundColor Green
 }
 
 function Disable-TrackingTasks {
     Write-Host "`n=== DISABLING SCHEDULED TRACKING TASKS ===" -ForegroundColor Magenta
-    
+
     $taskNames = @(
         "Microsoft Compatibility Appraiser",
         "ProgramDataUpdater",
@@ -108,18 +94,18 @@ function Disable-TrackingTasks {
         "AnalyzeSystem",
         "QueueReporting"
     )
-    
+
     foreach ($taskName in $taskNames) {
         Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue | Disable-ScheduledTask -ErrorAction SilentlyContinue | Out-Null
         Write-Host "  Disabled: $taskName" -ForegroundColor DarkYellow
     }
-    
+
     Write-Host "[OK] Scheduled tracking tasks disabled" -ForegroundColor Green
 }
 
 function Remove-Bloatware {
     Write-Host "`n=== REMOVING BLOATWARE APPS ===" -ForegroundColor Magenta
-    
+
     $bloatware = @(
         "Microsoft.BingNews",
         "Microsoft.BingWeather",
@@ -152,47 +138,40 @@ function Remove-Bloatware {
         "Microsoft.ZuneMusic",
         "Microsoft.ZuneVideo"
     )
-    
+
     foreach ($app in $bloatware) {
         Get-AppxPackage -Name $app -AllUsers | Remove-AppxPackage -ErrorAction SilentlyContinue
         Write-Host "  Removed: $app" -ForegroundColor DarkYellow
     }
-    
+
     Write-Host "[OK] Bloatware apps removed" -ForegroundColor Green
 }
 
 function Optimize-Performance {
     Write-Host "`n=== PERFORMANCE OPTIMIZATION ===" -ForegroundColor Magenta
-    
-    # Disable GameDVR
+
     reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\GameDVR" /v "AppCaptureEnabled" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
     reg add "HKCU\System\GameConfigStore" /v "GameDVR_Enabled" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
     reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\GameDVR" /v "AllowGameDVR" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
-    
-    # Disable web search in Start Menu
     reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "DisableWebSearch" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
     reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowSearchToUseLocation" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
-    
-    # Power plan: Balanced (for laptops)
+
     powercfg /setactive SCHEME_BALANCED 2>&1 | Out-Null
-    
-    # Disable animations (speeds up weak laptops)
+
     reg add "HKCU\Control Panel\Desktop" /v "UserPreferencesMask" /t REG_BINARY /d "9012038010000000" /f 2>&1 | Out-Null
     reg add "HKCU\Control Panel\Desktop\WindowMetrics" /v "MinAnimate" /t REG_SZ /d "0" /f 2>&1 | Out-Null
-    
+
     Write-Host "[OK] Performance optimization completed" -ForegroundColor Green
 }
 
 function Disable-OneDrive {
     Write-Host "`n=== REMOVING ONEDRIVE ===" -ForegroundColor Magenta
-    
-    # Stop the process
+
     Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
-    
-    # Remove OneDrive
+
     $onedrive32 = "$env:SYSTEMROOT\SysWOW64\OneDriveSetup.exe"
     $onedrive64 = "$env:SYSTEMROOT\System32\OneDriveSetup.exe"
-    
+
     if (Test-Path $onedrive32) {
         Start-Process $onedrive32 -ArgumentList "/uninstall" -NoNewWindow -Wait
         Write-Host "  OneDrive removed (32-bit)" -ForegroundColor Green
@@ -201,71 +180,143 @@ function Disable-OneDrive {
         Start-Process $onedrive64 -ArgumentList "/uninstall" -NoNewWindow -Wait
         Write-Host "  OneDrive removed (64-bit)" -ForegroundColor Green
     }
-    
-    # Remove registry leftovers (FIXED SYNTAX)
-    # Remove the Run entry if it exists
+
     reg delete "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /v "OneDriveSetup" /f 2>&1 | Out-Null
-    
-    # Remove the desktop namespace key if it exists
     reg delete "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /f 2>&1 | Out-Null
-    
-    # Also remove common OneDrive registry keys
     reg delete "HKCU\SOFTWARE\Microsoft\OneDrive" /f 2>&1 | Out-Null
     reg delete "HKLM\SOFTWARE\Microsoft\OneDrive" /f 2>&1 | Out-Null
-    
+
     Write-Host "[OK] OneDrive removed" -ForegroundColor Green
+}
+
+# ============================================
+# NEW: ADMIN-ONLY VM MODULE
+# For VMs used solely as an RDP/console jump-box (browser + terminal),
+# no battery, no printers, no local users beyond the admin.
+# Does NOT touch: TermService (RDP), Windows Defender, RpcSs, DcomLaunch,
+# EventLog, Winmgmt (WMI), LanmanServer/Workstation (SMB access).
+# ============================================
+
+function Optimize-AdminOnlyVM {
+    Write-Host "`n=== ADMIN-ONLY VM HARDENING & PERFORMANCE ===" -ForegroundColor Magenta
+
+    # --- Services with no purpose on a headless/browser+console-only VM ---
+    $vmServices = @(
+        "Spooler",              # Print Spooler - no printers
+        "Fax",                  # Fax service
+        "WSearch",               # Windows Search indexer - not needed without file browsing workloads
+        "TabletInputService",    # Tablet/touch input
+        "WbioSrvc",              # Windows Biometric Service
+        "PhoneSvc",              # Phone service
+        "BthAvctpSvc",           # Bluetooth AVCTP
+        "bthserv",               # Bluetooth Support Service
+        "XblAuthManager",        # Xbox Live Auth
+        "XblGameSave",           # Xbox Live Game Save
+        "XboxNetApiSvc",         # Xbox Live Networking
+        "Themes",                # Optional: keep off if you don't need custom desktop themes
+        "RetailDemo"             # Retail Demo Service - irrelevant, occasionally present
+    )
+
+    foreach ($svc in $vmServices) {
+        Stop-Service $svc -ErrorAction SilentlyContinue
+        Set-Service $svc -StartupType Disabled -ErrorAction SilentlyContinue
+        Write-Host "  Disabled: $svc" -ForegroundColor DarkYellow
+    }
+
+    # --- Extra bloatware relevant to recent Win10/11 builds ---
+    $extraBloatware = @(
+        "Microsoft.Todos",
+        "Microsoft.Clipchamp",
+        "Microsoft.Copilot",
+        "MicrosoftTeams",
+        "Microsoft.549981C3F5F10",   # Cortana app package
+        "Microsoft.WindowsFeedback",
+        "Microsoft.GamingApp",
+        "Clipchamp.Clipchamp"
+    )
+    foreach ($app in $extraBloatware) {
+        Get-AppxPackage -Name $app -AllUsers | Remove-AppxPackage -ErrorAction SilentlyContinue
+        Write-Host "  Removed: $app" -ForegroundColor DarkYellow
+    }
+
+    # --- Power plan: High performance (this is a VM, not a laptop - no battery to save) ---
+    powercfg /setactive SCHEME_MIN 2>&1 | Out-Null   # SCHEME_MIN = High performance GUID alias
+    Write-Host "  Power plan set to High performance" -ForegroundColor DarkYellow
+
+    # --- Disable hibernation (frees disk space, irrelevant for a VM) ---
+    powercfg /hibernate off 2>&1 | Out-Null
+    Write-Host "  Hibernation disabled" -ForegroundColor DarkYellow
+
+    # --- Visual effects: best performance (RDP renders client-side anyway) ---
+    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" /v "VisualFXSetting" /t REG_DWORD /d 2 /f 2>&1 | Out-Null
+    reg add "HKCU\Control Panel\Desktop" /v "DragFullWindows" /t REG_SZ /d "0" /f 2>&1 | Out-Null
+    reg add "HKCU\Control Panel\Desktop" /v "FontSmoothing" /t REG_SZ /d "0" /f 2>&1 | Out-Null
+    reg add "HKCU\Control Panel\Desktop\WindowMetrics" /v "MinAnimate" /t REG_SZ /d "0" /f 2>&1 | Out-Null
+    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v "TaskbarAnimations" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
+    reg add "HKCU\Software\Microsoft\Windows\DWM" /v "EnableAeroPeek" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
+
+    # --- Disable background apps globally ---
+    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications" /v "GlobalUserDisabled" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
+
+    # --- Disable Widgets / News and Interests / Web search in Start ---
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Dsh" /v "AllowNewsAndInterests" /t REG_DWORD /d 0 /f 2>&1 | Out-Null
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "DisableWebSearch" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
+
+    # --- Windows Update: notify only, no forced auto-restart while an admin might be mid-session ---
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" /v "NoAutoRebootWithLoggedOnUsers" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" /v "AUOptions" /t REG_DWORD /d 3 /f 2>&1 | Out-Null
+
+    # --- RDP session tuning: disable wallpaper/theming server-side hints for lighter sessions ---
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v "DisableWallPaper" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v "DisableFullWindowDrag" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v "DisableCursorBlinking" /t REG_DWORD /d 1 /f 2>&1 | Out-Null
+
+    Write-Host "[OK] Admin-only VM hardening completed" -ForegroundColor Green
+    Write-Host "  NOTE: Windows Defender was left untouched - this is an admin access point, keep it protected." -ForegroundColor Cyan
+    Write-Host "  NOTE: RemoteRegistry was disabled by Disable-PrivacyServices; re-enable manually if remote reg tools are needed." -ForegroundColor Cyan
 }
 
 function Show-Status {
     Write-Host "`n=== CURRENT STATUS ===" -ForegroundColor Cyan
-    
+
     $telemetry = (Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry" -ErrorAction SilentlyContinue).AllowTelemetry
-    if ($telemetry -eq 0) {
-        Write-Host "Telemetry: DISABLED" -ForegroundColor Green
-    } else {
-        Write-Host "Telemetry: ENABLED (risk)" -ForegroundColor Red
-    }
-    
+    if ($telemetry -eq 0) { Write-Host "Telemetry: DISABLED" -ForegroundColor Green } else { Write-Host "Telemetry: ENABLED (risk)" -ForegroundColor Red }
+
     $cortana = (Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search" -Name "AllowCortana" -ErrorAction SilentlyContinue).AllowCortana
-    if ($cortana -eq 0) {
-        Write-Host "Cortana: DISABLED" -ForegroundColor Green
-    } else {
-        Write-Host "Cortana: ENABLED" -ForegroundColor Yellow
-    }
-    
+    if ($cortana -eq 0) { Write-Host "Cortana: DISABLED" -ForegroundColor Green } else { Write-Host "Cortana: ENABLED" -ForegroundColor Yellow }
+
     $doMode = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config" -Name "DODownloadMode" -ErrorAction SilentlyContinue).DODownloadMode
-    if ($doMode -eq 0) {
-        Write-Host "Delivery Optimization (P2P): DISABLED" -ForegroundColor Green
-    } else {
-        Write-Host "Delivery Optimization (P2P): ENABLED" -ForegroundColor Yellow
-    }
-    
-    # Check OneDrive status
+    if ($doMode -eq 0) { Write-Host "Delivery Optimization (P2P): DISABLED" -ForegroundColor Green } else { Write-Host "Delivery Optimization (P2P): ENABLED" -ForegroundColor Yellow }
+
     $oneDriveProcess = Get-Process -Name "OneDrive" -ErrorAction SilentlyContinue
-    if (-not $oneDriveProcess) {
-        Write-Host "OneDrive: REMOVED" -ForegroundColor Green
-    } else {
-        Write-Host "OneDrive: STILL RUNNING" -ForegroundColor Yellow
-    }
+    if (-not $oneDriveProcess) { Write-Host "OneDrive: REMOVED" -ForegroundColor Green } else { Write-Host "OneDrive: STILL RUNNING" -ForegroundColor Yellow }
+
+    $powerScheme = (powercfg /getactivescheme)
+    Write-Host "Power scheme: $powerScheme" -ForegroundColor Cyan
+
+    $spooler = (Get-Service -Name Spooler -ErrorAction SilentlyContinue).StartType
+    if ($spooler -eq "Disabled") { Write-Host "Print Spooler: DISABLED" -ForegroundColor Green } else { Write-Host "Print Spooler: $spooler" -ForegroundColor Yellow }
 }
 
 function Show-Menu {
     Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════╗
-║           WINDOWS LAPTOP OPTIMIZER - MODULAR SCRIPT             ║
+║           WINDOWS LAPTOP / ADMIN-VM OPTIMIZER - MODULAR SCRIPT  ║
 ╚══════════════════════════════════════════════════════════════════╝
 
 AVAILABLE FUNCTIONS:
 
-  [1] Disable-Telemetry       - Disable telemetry (tracking) ⭐
+  [1] Disable-Telemetry       - Disable telemetry (tracking)
   [2] Disable-PrivacyServices - Disable tracking services
   [3] Disable-TrackingTasks   - Disable scheduled tracking tasks
   [4] Remove-Bloatware        - Remove bloatware apps
-  [5] Optimize-Performance    - Performance optimization
+  [5] Optimize-Performance    - Performance optimization (laptop-oriented)
   [6] Disable-OneDrive        - Remove OneDrive
   [7] Show-Status             - Show current status
-  [8] ALL FUNCTIONS           - Full optimization
+  [8] ALL FUNCTIONS           - Full optimization (laptop profile)
+  [9] Optimize-AdminOnlyVM    - Admin jump-box VM hardening ⭐
+  [A] ALL + ADMIN-VM          - Full optimization + VM module
   [Q] Exit
 
 "@
@@ -275,9 +326,8 @@ AVAILABLE FUNCTIONS:
 # COMMAND LINE PARAMETERS HANDLING
 # ============================================
 
-# Check if called with -Function parameter
 if ($args.Count -gt 0) {
-    $Function = $args[1]  # Get value after -Function
+    $Function = $args[1]
     switch ($Function.ToLower()) {
         "telemetry" { Disable-Telemetry }
         "privacy" { Disable-PrivacyServices }
@@ -286,6 +336,7 @@ if ($args.Count -gt 0) {
         "performance" { Optimize-Performance }
         "onedrive" { Disable-OneDrive }
         "status" { Show-Status }
+        "adminvm" { Optimize-AdminOnlyVM }
         "all" {
             Disable-Telemetry
             Disable-PrivacyServices
@@ -294,7 +345,16 @@ if ($args.Count -gt 0) {
             Optimize-Performance
             Disable-OneDrive
         }
-        default { Write-Host "Unknown function. Options: telemetry, privacy, tracking, bloatware, performance, onedrive, status, all" -ForegroundColor Red }
+        "allvm" {
+            Disable-Telemetry
+            Disable-PrivacyServices
+            Disable-TrackingTasks
+            Remove-Bloatware
+            Optimize-Performance
+            Disable-OneDrive
+            Optimize-AdminOnlyVM
+        }
+        default { Write-Host "Unknown function. Options: telemetry, privacy, tracking, bloatware, performance, onedrive, status, adminvm, all, allvm" -ForegroundColor Red }
     }
     exit 0
 }
@@ -306,8 +366,8 @@ if ($args.Count -gt 0) {
 do {
     Show-Menu
     $choice = Read-Host "Select function"
-    
-    switch ($choice) {
+
+    switch ($choice.ToLower()) {
         "1" { Disable-Telemetry }
         "2" { Disable-PrivacyServices }
         "3" { Disable-TrackingTasks }
@@ -324,13 +384,24 @@ do {
             Disable-OneDrive
             Write-Host "`nFull optimization completed!" -ForegroundColor Green
         }
+        "9" { Optimize-AdminOnlyVM }
+        "a" {
+            Disable-Telemetry
+            Disable-PrivacyServices
+            Disable-TrackingTasks
+            Remove-Bloatware
+            Optimize-Performance
+            Disable-OneDrive
+            Optimize-AdminOnlyVM
+            Write-Host "`nFull optimization + Admin-VM hardening completed!" -ForegroundColor Green
+        }
         "q" { Write-Host "Exiting..." -ForegroundColor Yellow }
         default { Write-Host "Invalid choice" -ForegroundColor Red }
     }
-    
-    if (($choice -ne "q") -and ($choice -ne "8")) {
+
+    if (($choice.ToLower() -ne "q") -and ($choice.ToLower() -ne "8") -and ($choice.ToLower() -ne "a")) {
         Write-Host "`nPress Enter to continue..."
         Read-Host
     }
-    
-} while ($choice -ne "q")
+
+} while ($choice.ToLower() -ne "q")
