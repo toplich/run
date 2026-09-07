@@ -120,14 +120,14 @@ try {
 if ($isVMwareGuest) {
     Write-Step "Detected VMware virtual hardware." 'OK'
 } else {
-    Write-Step "VMware virtual hardware not detected — continuing anyway (some steps will self-skip)." 'WARN'
+    Write-Step "VMware virtual hardware not detected - continuing anyway (some steps will self-skip)." 'WARN'
 }
 
 $vmwareToolsSvc = Get-Service -Name 'VMTools' -ErrorAction SilentlyContinue
 $hasVMwareTools = $null -ne $vmwareToolsSvc
 
 # ---------------------------------------------------------------------------
-# 1. Power management — force High Performance (avoid CPU throttling from
+# 1. Power management - force High Performance (avoid CPU throttling from
 #    guest-side power plans; ESXi already handles physical power management)
 # ---------------------------------------------------------------------------
 Write-Step "--- Power plan ---" 'INFO'
@@ -154,9 +154,9 @@ try {
 }
 
 # ---------------------------------------------------------------------------
-# 2. VMware Tools — time sync tuning
+# 2. VMware Tools - time sync tuning
 #    Best practice: let the guest sync only at specific events (boot/resume/
-#    snapshot), not continuously — continuous VMware Tools sync fights with
+#    snapshot), not continuously - continuous VMware Tools sync fights with
 #    w32time and causes clock drift/jumps. Use w32time against a real NTP
 #    source (or the domain hierarchy) for ongoing sync instead.
 # ---------------------------------------------------------------------------
@@ -184,10 +184,10 @@ if ($hasVMwareTools) {
         Set-RegistryValue -Path 'HKLM:\SOFTWARE\VMware, Inc.\VMware Tools' -Name 'Disabled' -Value 1
     }
 } else {
-    Write-Step "VMware Tools service not detected — skipping VMware time-sync steps. Install open-vm-tools/VMware Tools for guest optimizations (balloon driver, heartbeat, quiesced snapshots, clean shutdown)." 'WARN'
+    Write-Step "VMware Tools service not detected - skipping VMware time-sync steps. Install open-vm-tools/VMware Tools for guest optimizations (balloon driver, heartbeat, quiesced snapshots, clean shutdown)." 'WARN'
 }
 
-# If domain-joined, w32time already syncs from the domain hierarchy — leave it.
+# If domain-joined, w32time already syncs from the domain hierarchy - leave it.
 # If NOT domain-joined, point w32time at reliable external NTP servers.
 try {
     $partOfDomain = (Get-CimInstance Win32_ComputerSystem).PartOfDomain
@@ -206,7 +206,7 @@ try {
 # 3. Network adapter tuning (VMXNET3)
 #    Disable offloads/features known to occasionally cause issues on VMXNET3
 #    under load, and enable RSS for multi-queue scaling. These are the common
-#    VMware KB-recommended toggles — adjust if your workload benefits from
+#    VMware KB-recommended toggles - adjust if your workload benefits from
 #    offloading (test before/after with your actual traffic pattern).
 # ---------------------------------------------------------------------------
 Write-Step "--- Network adapter (VMXNET3) tuning ---" 'INFO'
@@ -223,7 +223,7 @@ if ($vmxnetAdapters) {
         Write-Step "Applied RSS-on / LSO-off / RSC-off where supported by this adapter's advanced properties." 'OK'
     }
 } else {
-    Write-Step "No 'Up' VMXNET3 adapters found — skipping NIC-specific tuning (safe if using E1000E or adapter is down)." 'SKIP'
+    Write-Step "No 'Up' VMXNET3 adapters found - skipping NIC-specific tuning (safe if using E1000E or adapter is down)." 'SKIP'
 }
 
 # TCP stack: enable modern congestion provider, disable legacy heuristics that
@@ -239,7 +239,7 @@ try {
 }
 
 # ---------------------------------------------------------------------------
-# 4. Storage — TRIM/UNMAP + disable scheduled defrag
+# 4. Storage - TRIM/UNMAP + disable scheduled defrag
 #    VMware thin-provisioned/SAN-backed disks benefit from UNMAP reclaiming
 #    space; scheduled defrag is pointless and I/O-wasteful on virtual disks.
 # ---------------------------------------------------------------------------
@@ -261,14 +261,14 @@ try {
 }
 
 # ---------------------------------------------------------------------------
-# 5. Memory — Superfetch/SysMain off (server workloads rarely benefit; also
+# 5. Memory - Superfetch/SysMain off (server workloads rarely benefit; also
 #    reduces background disk I/O that competes with the VMware balloon driver)
 # ---------------------------------------------------------------------------
 Write-Step "--- Memory / SysMain ---" 'INFO'
 Disable-ServiceSafely -Name 'SysMain'
 
 # ---------------------------------------------------------------------------
-# 6. Visual effects — set for best performance (server has no interactive
+# 6. Visual effects - set for best performance (server has no interactive
 #    desktop workload to justify Aero-style effects)
 # ---------------------------------------------------------------------------
 Write-Step "--- Visual effects ---" 'INFO'
@@ -283,7 +283,7 @@ try {
 }
 
 # ---------------------------------------------------------------------------
-# 7. Server Manager — stop auto-launch at logon (saves resources on RDP/
+# 7. Server Manager - stop auto-launch at logon (saves resources on RDP/
 #    console logons, purely cosmetic/annoyance fix)
 # ---------------------------------------------------------------------------
 Write-Step "--- Server Manager auto-start ---" 'INFO'
@@ -305,7 +305,7 @@ try {
 }
 
 # ---------------------------------------------------------------------------
-# 8. Telemetry / scheduled tasks cleanup (safe subset — does not touch
+# 8. Telemetry / scheduled tasks cleanup (safe subset - does not touch
 #    Windows Update, Defender, or licensing-related tasks)
 # ---------------------------------------------------------------------------
 Write-Step "--- Telemetry & scheduled task cleanup ---" 'INFO'
@@ -339,7 +339,7 @@ foreach ($taskPath in $tasksToDisable) {
 }
 
 # ---------------------------------------------------------------------------
-# 9. Page file — leave system-managed unless a fixed size was requested
+# 9. Page file - leave system-managed unless a fixed size was requested
 # ---------------------------------------------------------------------------
 Write-Step "--- Page file ---" 'INFO'
 if ($PSBoundParameters.ContainsKey('FixedPageFileGB')) {
@@ -366,7 +366,7 @@ if ($PSBoundParameters.ContainsKey('FixedPageFileGB')) {
 }
 
 # ---------------------------------------------------------------------------
-# 10. Event logs — bump size so rotation doesn't lose data on a busy VM
+# 10. Event logs - bump size so rotation doesn't lose data on a busy VM
 # ---------------------------------------------------------------------------
 Write-Step "--- Event log sizing ---" 'INFO'
 try {
@@ -379,8 +379,8 @@ try {
 }
 
 # ---------------------------------------------------------------------------
-# 11. Windows Update — optionally suppress automatic restarts only
-#     (updates themselves are NOT disabled — that would be a security risk)
+# 11. Windows Update - optionally suppress automatic restarts only
+#     (updates themselves are NOT disabled - that would be a security risk)
 # ---------------------------------------------------------------------------
 Write-Step "--- Windows Update behavior ---" 'INFO'
 if ($DisableWindowsUpdateAutomaticRestart) {
@@ -395,7 +395,7 @@ if ($DisableWindowsUpdateAutomaticRestart) {
 }
 
 # ---------------------------------------------------------------------------
-# 12. VMware Tools & Defender exclusions — reduce false-positive AV overhead
+# 12. VMware Tools & Defender exclusions - reduce false-positive AV overhead
 #     on VMware Tools' own processes/paths (only added if paths exist)
 # ---------------------------------------------------------------------------
 Write-Step "--- Defender exclusions for VMware Tools ---" 'INFO'
@@ -410,11 +410,11 @@ if ($hasVMwareTools) {
         Write-Step "Could not add Defender exclusion (Defender may be managed by policy/third-party AV): $($_.Exception.Message)" 'WARN'
     }
 } else {
-    Write-Step "VMware Tools not present — skipping exclusion." 'SKIP'
+    Write-Step "VMware Tools not present - skipping exclusion." 'SKIP'
 }
 
 # ---------------------------------------------------------------------------
-# 13. SMBv1 — disable legacy, insecure protocol (near-universally safe unless
+# 13. SMBv1 - disable legacy, insecure protocol (near-universally safe unless
 #     you have ancient devices/NAS that require it)
 # ---------------------------------------------------------------------------
 Write-Step "--- SMBv1 ---" 'INFO'
@@ -426,20 +426,20 @@ try {
 }
 
 # ===========================================================================
-# AGGRESSIVE / OPT-IN SECTION — only runs with -IncludeAggressive
+# AGGRESSIVE / OPT-IN SECTION - only runs with -IncludeAggressive
 # Review carefully: these can affect DCs, print servers, or LAN-only setups.
 # ===========================================================================
 if ($IncludeAggressive) {
     Write-Step "=== Aggressive optimizations (-IncludeAggressive) ===" 'WARN'
 
-    # Print Spooler — safe to disable unless this box is a print server
+    # Print Spooler - safe to disable unless this box is a print server
     Disable-ServiceSafely -Name 'Spooler'
 
-    # Windows Search indexing — server workloads rarely need content indexing;
+    # Windows Search indexing - server workloads rarely need content indexing;
     # skip this on file servers where users rely on search.
     Disable-ServiceSafely -Name 'WSearch'
 
-    # NetBIOS over TCP/IP — disable on all adapters (legacy name resolution,
+    # NetBIOS over TCP/IP - disable on all adapters (legacy name resolution,
     # not needed on networks with functioning DNS)
     try {
         $nics = Get-CimInstance -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled = True"
@@ -451,7 +451,7 @@ if ($IncludeAggressive) {
         Write-Step "NetBIOS disable failed: $($_.Exception.Message)" 'WARN'
     }
 
-    # IPv6 — disable only if your network is confirmed IPv4-only end-to-end
+    # IPv6 - disable only if your network is confirmed IPv4-only end-to-end
     try {
         Get-NetAdapterBinding -ComponentID ms_tcpip6 | Disable-NetAdapterBinding -ComponentID ms_tcpip6 -ErrorAction SilentlyContinue
         Write-Step "IPv6 binding disabled on all adapters (verify nothing on your network depends on it, incl. NetBird/WireGuard-style tooling)." 'OK'
